@@ -3,13 +3,10 @@
       {
         "source": "/api/:path*",
         "destination": "https://web-production-5d0d5.up.railway.app/api/:path*"
-      }
-    ],
-    "routes": [
+      },
       {
-        "src": "/[^.]+",
-        "dest": "/",
-        "status": 200
+        "source": "/((?!assets/).*)",
+        "destination": "/index.html"
       }
     ]
   }
