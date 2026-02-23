@@ -8,7 +8,7 @@ const TEAM = [
     name: "Gilang Laba",
     role: "Product Manager",
     color: theme.violet,
-    desc: "10+ years leading product development. Now focused on building AI products that are safe, trustworthy, and governance-ready.",
+    desc: "Product leader focused on building AI products that are safe, trustworthy, and governance-ready.",
   },
   {
     initials: "JM",
