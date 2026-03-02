@@ -1,4 +1,4 @@
-# SafeCouncil (safecouncil.vercell.app)
+# SafeCouncil (safecouncil.vercel.app)
 
 **Multi-agent AI safety evaluation platform for humanitarian and high-stakes AI deployments.**
 
