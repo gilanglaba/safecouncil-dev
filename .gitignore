@@ -32,6 +32,9 @@ backend/governance/documents/*
 node_modules/
 .npm/
 
+# Reference projects (local only, used by Claude Code agents)
+reference/
+
 # OS
 .DS_Store
 Thumbs.db
