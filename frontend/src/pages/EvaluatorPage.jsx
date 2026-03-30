@@ -411,7 +411,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <SectionHead num="2" title="Expert Configuration" badge={<Badge color={theme.textTer}>{activeExperts} active</Badge>} />
           <button
-            onClick={() => setShowAddExpert(!showAddExpert)}
+            onClick={() => alert("Add Expert will be available soon.")}
             style={{ fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 8, border: `1px solid ${theme.border}`, cursor: "pointer", background: theme.surface, color: theme.violet }}
           >
             + Add Expert
@@ -441,40 +441,11 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
                     <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{ex.model}</div>
                   </div>
                 </div>
-                <Toggle checked={ex.enabled} onChange={() => toggleExpert(ex.id)} color={ex.color} />
               </div>
               <div style={{ fontSize: 12, color: ex.color, fontWeight: 500 }}>{ex.company}</div>
             </div>
           ))}
         </div>
-        {showAddExpert && (
-          <div style={{ marginTop: 14, padding: 18, background: theme.bgWarm, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-            <p style={{ fontSize: 14, fontWeight: 600, color: theme.text, margin: "0 0 12px" }}>Add Custom Expert</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>Expert Name</label>
-                <input placeholder="e.g., Expert 4" style={inputStyle} onFocus={(e) => { e.target.style.borderColor = theme.violet; }} onBlur={(e) => { e.target.style.borderColor = theme.border; }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>LLM Provider</label>
-                <select style={{ ...inputStyle, cursor: "pointer" }}>
-                  <option>Claude (Anthropic)</option>
-                  <option>GPT-4o (OpenAI)</option>
-                  <option>Gemini (Google)</option>
-                  <option>Llama (Local)</option>
-                  <option>Custom API</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>API Key</label>
-                <input type="password" placeholder="Your API key" style={inputStyle} onFocus={(e) => { e.target.style.borderColor = theme.violet; }} onBlur={(e) => { e.target.style.borderColor = theme.border; }} />
-              </div>
-            </div>
-            <button style={{ fontSize: 13, fontWeight: 600, padding: "8px 20px", borderRadius: 8, border: "none", cursor: "pointer", background: theme.violet, color: "#fff", marginTop: 12 }}>
-              Add Expert
-            </button>
-          </div>
-        )}
       </div>
 
       {/* ── SECTION 3: Governance Frameworks & Context ─────────────────────── */}
@@ -571,27 +542,48 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
       )}
 
       <div style={{ textAlign: "center", padding: "20px 0" }}>
-        <button
-          onClick={handleSubmit}
-          disabled={!canSubmit || submitting}
-          style={{
-            fontSize: 16,
-            fontWeight: 600,
-            padding: "16px 48px",
-            borderRadius: 12,
-            border: "none",
-            cursor: canSubmit && !submitting ? "pointer" : "not-allowed",
-            background: canSubmit && !submitting ? theme.violet : theme.border,
-            color: "#fff",
-            boxShadow: canSubmit && !submitting ? "0 4px 20px rgba(87,6,140,0.25)" : "none",
-            opacity: canSubmit && !submitting ? 1 : 0.5,
-            transition: theme.transition,
-          }}
-          onMouseEnter={(e) => { if (canSubmit && !submitting) e.currentTarget.style.background = theme.violetHover; }}
-          onMouseLeave={(e) => { if (canSubmit && !submitting) e.currentTarget.style.background = theme.violet; }}
-        >
-          {submitting ? "Starting evaluation..." : "Run Council Evaluation →"}
-        </button>
+        <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+          <button
+            onClick={handleSubmit}
+            disabled={!canSubmit || submitting}
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              padding: "16px 48px",
+              borderRadius: 12,
+              border: "none",
+              cursor: canSubmit && !submitting ? "pointer" : "not-allowed",
+              background: canSubmit && !submitting ? theme.violet : theme.border,
+              color: "#fff",
+              boxShadow: canSubmit && !submitting ? "0 4px 20px rgba(87,6,140,0.25)" : "none",
+              opacity: canSubmit && !submitting ? 1 : 0.5,
+              transition: theme.transition,
+            }}
+            onMouseEnter={(e) => { if (canSubmit && !submitting) e.currentTarget.style.background = theme.violetHover; }}
+            onMouseLeave={(e) => { if (canSubmit && !submitting) e.currentTarget.style.background = theme.violet; }}
+          >
+            {submitting ? "Starting evaluation..." : "Run Council Evaluation →"}
+          </button>
+          <button
+            onClick={onDemoLoad}
+            disabled={submitting}
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              padding: "16px 28px",
+              borderRadius: 12,
+              border: `1px solid ${theme.unBlue}33`,
+              cursor: submitting ? "wait" : "pointer",
+              background: theme.unBluePale,
+              color: theme.unBlueDark,
+              transition: theme.transition,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = theme.unBlue + "22"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = theme.unBluePale; }}
+          >
+            ▶ Test Demo
+          </button>
+        </div>
         <p style={{ fontSize: 12, color: theme.textTer, marginTop: 8 }}>
           {activeExperts} expert{activeExperts !== 1 ? "s" : ""} × {selectedFrameworks} framework{selectedFrameworks !== 1 ? "s" : ""}
         </p>
