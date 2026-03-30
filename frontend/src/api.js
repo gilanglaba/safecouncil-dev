@@ -61,4 +61,23 @@ export const api = {
     const res = await fetch(`${API_BASE}/api/health`);
     return handleResponse(res);
   },
+
+  uploadGovernanceDoc: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_BASE}/api/governance/upload`, {
+      method: "POST",
+      body: formData,
+    });
+    return handleResponse(res);
+  },
+
+  confirmGovernanceDimensions: async (yaml, filename) => {
+    const res = await fetch(`${API_BASE}/api/governance/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ yaml, filename }),
+    });
+    return handleResponse(res);
+  },
 };

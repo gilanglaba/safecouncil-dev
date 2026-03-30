@@ -78,7 +78,8 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
     { id: "iso42001", label: "ISO 42001", desc: "AI management system standard", checked: false },
     { id: "unicc", label: "UNICC AI Governance", desc: "UN-specific data sovereignty, sandbox policies", checked: false },
   ]);
-  const [uploadedDocs, setUploadedDocs] = useState([]);
+  const [uploadedDocs, setUploadedDocs] = useState([]);  // [{filename, status, yaml, error}]
+  const [reviewingDoc, setReviewingDoc] = useState(null); // {filename, yaml} — doc being reviewed
   const [orchestrationMethod, setOrchestrationMethod] = useState("deliberative");
 
   const selectedToolData = TOOL_CATALOG.find(tc => tc.id === selectedTool);
@@ -501,31 +502,136 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
         {/* Custom governance doc upload */}
         <div style={{ borderTop: `1px solid ${theme.borderSubtle}`, paddingTop: 18 }}>
           <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 8 }}>Upload Custom Governance Documents (Optional)</label>
-          <p style={{ fontSize: 12, color: theme.textTer, margin: "0 0 12px" }}>Upload your organization's internal AI policies. These will be injected into expert prompts as additional evaluation context via RAG.</p>
+          <p style={{ fontSize: 12, color: theme.textTer, margin: "0 0 12px" }}>
+            Upload your organization's internal AI policies. Our AI will extract evaluation dimensions from the document for your review.
+          </p>
           <div
             style={{ border: `1px dashed ${theme.border}`, borderRadius: 10, padding: 20, textAlign: "center", cursor: "pointer" }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.violet; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; }}
             onClick={() => docInputRef.current?.click()}
           >
-            <input ref={docInputRef} type="file" accept=".pdf,.docx,.txt" style={{ display: "none" }} onChange={(e) => {
-              if (e.target.files[0]) setUploadedDocs((d) => [...d, e.target.files[0].name]);
+            <input ref={docInputRef} type="file" accept=".pdf,.docx,.txt" style={{ display: "none" }} onChange={async (e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+              const docEntry = { filename: file.name, status: "uploading", yaml: null, error: null };
+              setUploadedDocs((d) => [...d, docEntry]);
+              try {
+                const result = await api.uploadGovernanceDoc(file);
+                setUploadedDocs((d) => d.map((doc) =>
+                  doc.filename === file.name ? { ...doc, status: "review", yaml: result.yaml } : doc
+                ));
+                setReviewingDoc({ filename: file.name, yaml: result.yaml });
+              } catch (err) {
+                setUploadedDocs((d) => d.map((doc) =>
+                  doc.filename === file.name ? { ...doc, status: "error", error: err.message } : doc
+                ));
+              }
+              e.target.value = "";
             }} />
             <p style={{ fontSize: 13, color: theme.textSec, margin: 0 }}>📎 Drop policy documents here — PDF, DOCX, TXT</p>
           </div>
+
+          {/* Uploaded docs list */}
           {uploadedDocs.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
               {uploadedDocs.map((doc, i) => (
-                <span key={i} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, background: theme.violetPale, color: theme.violet, fontWeight: 500 }}>
-                  📎 {doc}
-                  <button
-                    onClick={() => setUploadedDocs((d) => d.filter((_, idx) => idx !== i))}
-                    style={{ background: "none", border: "none", color: theme.violet, cursor: "pointer", marginLeft: 4, fontWeight: 700 }}
-                  >
-                    ×
-                  </button>
-                </span>
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  fontSize: 12, padding: "8px 12px", borderRadius: 8,
+                  background: doc.status === "confirmed" ? theme.greenPale : doc.status === "error" ? theme.redPale : theme.violetPale,
+                  border: `1px solid ${doc.status === "confirmed" ? theme.green + "30" : doc.status === "error" ? theme.red + "30" : theme.violet + "30"}`,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>{doc.status === "uploading" ? "⏳" : doc.status === "review" ? "👁" : doc.status === "confirmed" ? "✓" : "✕"}</span>
+                    <span style={{ fontWeight: 500, color: theme.text }}>{doc.filename}</span>
+                    <span style={{ color: theme.textTer }}>
+                      {doc.status === "uploading" && "— AI extracting dimensions..."}
+                      {doc.status === "review" && "— Ready for review"}
+                      {doc.status === "confirmed" && "— Dimensions saved"}
+                      {doc.status === "error" && `— ${doc.error}`}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {doc.status === "review" && (
+                      <button
+                        onClick={() => setReviewingDoc({ filename: doc.filename, yaml: doc.yaml })}
+                        style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: `1px solid ${theme.violet}44`, background: theme.surface, color: theme.violet, cursor: "pointer" }}
+                      >
+                        Review
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setUploadedDocs((d) => d.filter((_, idx) => idx !== i))}
+                      style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: `1px solid ${theme.border}`, background: theme.surface, color: theme.textTer, cursor: "pointer" }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
               ))}
+            </div>
+          )}
+
+          {/* YAML review modal */}
+          {reviewingDoc && (
+            <div style={{
+              marginTop: 14, padding: 18, background: theme.bgWarm, borderRadius: 12,
+              border: `1px solid ${theme.violet}33`,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Review Extracted Dimensions</span>
+                  <span style={{ fontSize: 12, color: theme.textTer, marginLeft: 8 }}>{reviewingDoc.filename}</span>
+                </div>
+                <button
+                  onClick={() => setReviewingDoc(null)}
+                  style={{ background: "none", border: "none", fontSize: 16, color: theme.textTer, cursor: "pointer" }}
+                >✕</button>
+              </div>
+              <p style={{ fontSize: 12, color: theme.textTer, margin: "0 0 10px" }}>
+                Review the YAML below. Edit if needed, then confirm to save as custom evaluation dimensions.
+              </p>
+              <textarea
+                value={reviewingDoc.yaml}
+                onChange={(e) => setReviewingDoc({ ...reviewingDoc, yaml: e.target.value })}
+                rows={14}
+                style={{
+                  width: "100%", fontFamily: theme.fontMono, fontSize: 12, lineHeight: 1.5,
+                  padding: 12, border: `1px solid ${theme.border}`, borderRadius: 8,
+                  background: theme.surface, color: theme.text, outline: "none", resize: "vertical",
+                }}
+              />
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.confirmGovernanceDimensions(reviewingDoc.yaml, reviewingDoc.filename);
+                      setUploadedDocs((d) => d.map((doc) =>
+                        doc.filename === reviewingDoc.filename ? { ...doc, status: "confirmed" } : doc
+                      ));
+                      setReviewingDoc(null);
+                    } catch (err) {
+                      alert("Failed to save: " + err.message);
+                    }
+                  }}
+                  style={{
+                    fontSize: 13, fontWeight: 600, padding: "8px 20px", borderRadius: 8,
+                    border: "none", cursor: "pointer", background: theme.violet, color: "#fff",
+                  }}
+                >
+                  Confirm & Save Dimensions
+                </button>
+                <button
+                  onClick={() => setReviewingDoc(null)}
+                  style={{
+                    fontSize: 13, fontWeight: 600, padding: "8px 20px", borderRadius: 8,
+                    border: `1px solid ${theme.border}`, cursor: "pointer", background: theme.surface, color: theme.textSec,
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>
