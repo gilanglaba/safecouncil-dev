@@ -82,7 +82,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
   const [frameworks, setFrameworks] = useState(["eu_ai_act", "nist", "owasp", "unesco"]);
   const [availableFrameworks, setAvailableFrameworks] = useState([]);
   const [activeInputTab, setActiveInputTab] = useState("manual");
-  const [apiConfig, setApiConfig] = useState({ endpoint: "", api_key: "", model: "", probe_count: 20 });
+  const [apiConfig, setApiConfig] = useState({ endpoint: "", api_key: "", model: "" });
   const [uploadedConversations, setUploadedConversations] = useState([]);
   const [uploadFileName, setUploadFileName] = useState("");
   const [uploadError, setUploadError] = useState(null);
@@ -214,7 +214,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
     if (activeInputTab === "manual") {
       onSubmit({ ...base, conversations: conversations.filter((c) => c.prompt.trim() && c.output.trim()), input_method: "manual" });
     } else if (activeInputTab === "api") {
-      onSubmit({ ...base, conversations: [], input_method: "api_probe", api_config: { endpoint: apiConfig.endpoint, api_key: apiConfig.api_key, model: apiConfig.model, probe_count: apiConfig.probe_count } });
+      onSubmit({ ...base, conversations: [], input_method: "api_probe", api_config: { endpoint: apiConfig.endpoint, api_key: apiConfig.api_key, model: apiConfig.model } });
     } else {
       onSubmit({ ...base, conversations: uploadedConversations, input_method: "upload" });
     }
@@ -489,37 +489,10 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
               </div>
             </div>
 
-            <div>
-              <label style={{ fontSize: 13, fontWeight: 600, color: theme.text, display: "block", marginBottom: 8 }}>
-                Probe Count — how many test prompts to generate and send
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {[10, 20, 30].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setApiConfig({ ...apiConfig, probe_count: n })}
-                    style={{
-                      padding: "7px 18px",
-                      borderRadius: theme.radiusFull,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      border: `1.5px solid ${apiConfig.probe_count === n ? theme.violet : theme.border}`,
-                      background: apiConfig.probe_count === n ? theme.violetPale : theme.surface,
-                      color: apiConfig.probe_count === n ? theme.violet : theme.textSec,
-                      cursor: "pointer",
-                      transition: theme.transition,
-                    }}
-                  >
-                    {n} probes
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div style={{ background: theme.violetPale, border: `1px solid ${theme.violetBorder}`, borderRadius: theme.radius, padding: "12px 16px", fontSize: 13, color: theme.text, lineHeight: 1.6 }}>
               <strong style={{ color: theme.violet }}>How it works:</strong> SafeCouncil will use Claude to generate{" "}
-              <strong>{apiConfig.probe_count}</strong> test prompts across 6 categories (normal, adversarial,
-              privacy, bias, edge-case, boundary) and send each one to your endpoint. The responses are then
+              <strong>30</strong> test prompts covering all <strong>15</strong> evaluation dimensions
+              (2 per dimension) and send each one to your endpoint. The responses are then
               evaluated by the expert council.
             </div>
           </div>
@@ -1731,7 +1704,7 @@ export default function EvaluatorPage() {
       setEvalMeta({
         agentName: data.agent_name,
         numConversations: data.input_method === "api_probe"
-          ? (data.api_config?.probe_count || 0)
+          ? 30
           : data.conversations.length,
         numExperts: data.experts.filter((e) => e.enabled).length,
       });

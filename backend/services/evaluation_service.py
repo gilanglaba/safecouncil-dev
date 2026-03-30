@@ -168,7 +168,6 @@ class EvaluationService:
             # ── PROBE PHASE (api_probe mode only) ────────────────────────────
             if is_probe:
                 api_config = eval_input.api_config or {}
-                probe_count = max(1, int(api_config.get("probe_count", 20)))
 
                 # Step 0: Generate test prompts with Claude
                 self._update_step(job, 0, "running", "Generating test prompts with Claude...", 2)
@@ -178,7 +177,7 @@ class EvaluationService:
                         anthropic_api_key=Config.ANTHROPIC_API_KEY,
                         model=Config.CLAUDE_MODEL,
                     )
-                    test_prompts = probe.generate_test_prompts(eval_input.use_case, probe_count)
+                    test_prompts = probe.generate_test_prompts(eval_input.use_case)
                     self._update_step(job, 0, "complete", f"Generated {len(test_prompts)} test prompts", 5)
                 except Exception as e:
                     logger.error(f"[{eval_id}] Prompt generation failed: {e}")
