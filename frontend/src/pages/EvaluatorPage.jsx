@@ -785,13 +785,13 @@ function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onCo
 
       const schedule = [
         [0,     snap(0, 5,  "Retrieving governance context (RAG)...")],
-        [950,   snap(1, 12, "Expert 1 (Claude) evaluating...")],
-        [2900,  snap(2, 28, "Expert 2 (GPT-4o) evaluating...")],
-        [4800,  snap(3, 45, "Expert 3 (Gemini) evaluating...")],
-        [6700,  snap(4, 64, "Cross-critique: Experts reviewing each other...")],
-        [8300,  snap(5, 82, "Council debate & synthesis...")],
-        [10100, snap(6, 94, "Generating final verdict & mitigations...")],
-        [11200, {
+        [300,   snap(1, 15, "Expert 1 (Claude) evaluating...")],
+        [700,   snap(2, 30, "Expert 2 (GPT-4o) evaluating...")],
+        [1100,  snap(3, 50, "Expert 3 (Gemini) evaluating...")],
+        [1500,  snap(4, 65, "Cross-critique: Experts reviewing each other...")],
+        [1900,  snap(5, 82, "Council debate & synthesis...")],
+        [2300,  snap(6, 94, "Generating final verdict & mitigations...")],
+        [2700, {
           progress: 100,
           current_step: "Evaluation complete",
           steps_completed: STEPS.map((s) => ({ step: s, status: "complete" })),

@@ -29,11 +29,20 @@ const SEVERITY_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
 function ExpertCard({ assessment }) {
   const topFindings = (assessment.findings || []).slice(0, 3);
-  const safetyAvg = categoryAvg(assessment.dimension_scores || [], "Safety");
-  const govAvg = categoryAvg(assessment.dimension_scores || [], "Governance & Compliance");
-  const trustAvg = categoryAvg(assessment.dimension_scores || [], "Transparency & Accountability");
-  const fairAvg = categoryAvg(assessment.dimension_scores || [], "Fairness & Ethics");
-  const privAvg = categoryAvg(assessment.dimension_scores || [], "Privacy & Data");
+  const scores = assessment.dimension_scores || [];
+
+  // Dynamically detect categories from the data — no hardcoded names
+  const categoryOrder = [];
+  const seen = new Set();
+  for (const d of scores) {
+    if (!seen.has(d.category)) {
+      seen.add(d.category);
+      categoryOrder.push(d.category);
+    }
+  }
+  const categoryBars = categoryOrder
+    .map((cat) => [cat, categoryAvg(scores, cat)])
+    .filter(([, v]) => v !== null);
 
   const color = getSpeakerColor(assessment.expert_name);
   const scoreColor = getScoreColor(assessment.overall_score);
@@ -64,15 +73,9 @@ function ExpertCard({ assessment }) {
           </div>
         </div>
 
-        {/* Category bars */}
+        {/* Category bars — dynamically derived from dimension data */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {[
-            ["Safety", safetyAvg],
-            ["Privacy & Data", privAvg],
-            ["Fairness & Ethics", fairAvg],
-            ["Transparency", trustAvg],
-            ["Governance", govAvg],
-          ].filter(([, v]) => v !== null).map(([label, val]) => (
+          {categoryBars.map(([label, val]) => (
             <div key={label}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: theme.textSec, marginBottom: 3 }}>
                 <span>{label}</span>
