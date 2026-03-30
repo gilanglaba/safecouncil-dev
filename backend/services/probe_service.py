@@ -279,3 +279,36 @@ Return a JSON array of exactly {probe_count} objects. Each object must have: cat
         while len(result) < count:
             result.extend(base_prompts)
         return result[:count]
+
+
+def load_predefined_probes(yaml_path: str = None) -> list:
+    """
+    Load predefined test probes from the YAML library.
+    Returns a list of dicts: [{category, label, prompt, maps_to_dimensions}, ...]
+    """
+    import os
+    import yaml
+
+    if yaml_path is None:
+        yaml_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "probes", "default_probes.yaml"
+        )
+
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    probes = []
+    for category in data.get("categories", []):
+        cat_name = category["name"]
+        dims = category.get("maps_to_dimensions", [])
+        for probe in category.get("probes", []):
+            probes.append({
+                "category": cat_name,
+                "label": probe["label"],
+                "prompt": probe["prompt"],
+                "maps_to_dimensions": dims,
+            })
+
+    logger.info(f"Loaded {len(probes)} predefined probes from {yaml_path}")
+    return probes

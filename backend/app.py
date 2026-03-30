@@ -197,6 +197,44 @@ def get_evaluation_result(eval_id: str):
         return jsonify({"error": "Failed to retrieve evaluation result."}), 500
 
 
+@app.route("/api/evaluate/<eval_id>/pdf", methods=["GET"])
+def get_evaluation_pdf(eval_id):
+    """
+    Download evaluation result as a PDF report.
+    Uses the editable template at backend/templates/report_template.html
+    """
+    from services.pdf_service import generate_pdf
+    from flask import send_file
+    from io import BytesIO
+
+    try:
+        result = eval_service.get_result(eval_id)
+        if result is None:
+            return jsonify({"error": "Evaluation not found or still running."}), 404
+
+        pdf_bytes = generate_pdf(result)
+
+        # Determine content type based on whether xhtml2pdf is available
+        content_type = "application/pdf"
+        filename = f"safecouncil-report-{eval_id}.pdf"
+
+        # If pdf_bytes is actually HTML (xhtml2pdf not installed), adjust
+        if pdf_bytes[:5] == b"<!DOC" or pdf_bytes[:5] == b"<html":
+            content_type = "text/html"
+            filename = f"safecouncil-report-{eval_id}.html"
+
+        return send_file(
+            BytesIO(pdf_bytes),
+            mimetype=content_type,
+            as_attachment=True,
+            download_name=filename,
+        )
+
+    except Exception as e:
+        logger.error(f"Error generating PDF for {eval_id}: {e}", exc_info=True)
+        return jsonify({"error": "Failed to generate PDF report."}), 500
+
+
 @app.route("/api/evaluations", methods=["GET"])
 def list_evaluations():
     """
@@ -242,6 +280,69 @@ def list_evaluations():
     except Exception as e:
         logger.error(f"Error listing evaluations: {e}", exc_info=True)
         return jsonify({"error": "Failed to list evaluations."}), 500
+
+
+@app.route("/api/governance/upload", methods=["POST"])
+def upload_governance_doc():
+    """
+    Upload a governance document (PDF/DOCX/TXT).
+    AI extracts evaluation dimensions and returns YAML for user verification.
+    """
+    from governance.doc_to_yaml_service import extract_text_from_file, extract_dimensions_from_text
+    import tempfile
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided."}), 400
+
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "No file selected."}), 400
+
+    try:
+        # Save uploaded file temporarily
+        ext = os.path.splitext(file.filename)[1]
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
+
+        # Extract text
+        text = extract_text_from_file(tmp_path)
+        os.unlink(tmp_path)
+
+        if not text.strip():
+            return jsonify({"error": "Could not extract text from the uploaded file."}), 400
+
+        # Use LLM to extract dimensions
+        yaml_text = extract_dimensions_from_text(text)
+
+        return jsonify({
+            "yaml": yaml_text,
+            "filename": file.filename,
+            "text_length": len(text),
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Governance doc upload failed: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/governance/confirm", methods=["POST"])
+def confirm_governance_dimensions():
+    """
+    Save user-verified custom dimensions YAML.
+    """
+    from governance.doc_to_yaml_service import save_custom_dimensions
+
+    data = request.get_json()
+    if not data or "yaml" not in data or "filename" not in data:
+        return jsonify({"error": "Missing 'yaml' and 'filename' in request body."}), 400
+
+    try:
+        path = save_custom_dimensions(data["yaml"], data["filename"])
+        return jsonify({"saved": True, "path": path}), 200
+    except Exception as e:
+        logger.error(f"Failed to save custom dimensions: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/frameworks", methods=["GET"])

@@ -1,113 +1,92 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer";
-import VerdictBadge from "../components/VerdictBadge";
-import SeverityBadge from "../components/SeverityBadge";
-import ScoreBar from "../components/ScoreBar";
 import Badge from "../components/Badge";
-import { theme, getSpeakerColor, getScoreColor } from "../theme";
+import SectionHead from "../components/SectionHead";
+import CompanyIcon from "../components/CompanyIcon";
+import { theme } from "../theme";
 import { api } from "../api";
 import { DEMO_RESULT } from "../demoResult";
+
+// ── Tool Catalog ──────────────────────────────────────────────────────────────
+const TOOL_CATALOG = [
+  { id: "wfp_support_bot", name: "WFP Support Bot", desc: "Customer support for humanitarian aid distribution, eligibility, and complaints" },
+  { id: "unicef_gpt", name: "UNICEF-GPT", desc: "Child welfare Q&A, vaccination schedules, and education initiatives" },
+  { id: "unhcr_refugee_assistant", name: "UNHCR Refugee Assistant", desc: "Asylum procedures, resettlement information, and legal rights" },
+  { id: "who_health_advisor", name: "WHO Health Advisor", desc: "Health guidance, disease information, and vaccination recommendations" },
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INPUT PHASE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function Toggle({ checked, onChange }) {
+function Toggle({ checked, onChange, color }) {
+  const bg = color || theme.violet;
   return (
     <div
       onClick={() => onChange(!checked)}
       style={{
-        width: 40,
-        height: 22,
-        borderRadius: 11,
-        background: checked ? theme.violet : theme.border,
+        width: 38,
+        height: 20,
+        borderRadius: 10,
+        background: checked ? bg : theme.border,
         position: "relative",
         cursor: "pointer",
-        transition: "background 0.2s",
+        transition: "background 0.3s",
         flexShrink: 0,
       }}
     >
       <div
         style={{
           position: "absolute",
-          top: 3,
-          left: checked ? 20 : 3,
+          top: 2,
+          left: checked ? 20 : 2,
           width: 16,
           height: 16,
-          borderRadius: "50%",
+          borderRadius: 8,
           background: "#fff",
-          transition: "left 0.2s",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+          transition: "left 0.3s",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
         }}
       />
     </div>
   );
 }
 
-function SectionCard({ title, subtitle, children }) {
-  return (
-    <div
-      style={{
-        background: theme.surface,
-        border: `1px solid ${theme.border}`,
-        borderRadius: theme.radiusMd,
-        overflow: "hidden",
-        marginBottom: 20,
-      }}
-    >
-      <div style={{ padding: "20px 24px", borderBottom: `1px solid ${theme.borderSubtle}` }}>
-        <div style={{ fontWeight: 700, fontSize: 16, color: theme.text }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 13, color: theme.textSec, marginTop: 4 }}>{subtitle}</div>}
-      </div>
-      <div style={{ padding: "24px" }}>{children}</div>
-    </div>
-  );
-}
-
 function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
   const fileInputRef = useRef(null);
-  const [agentName, setAgentName] = useState("");
-  const [useCase, setUseCase] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
-  const [environment, setEnvironment] = useState("");
-  const [dataSensitivity, setDataSensitivity] = useState("High");
-  const [conversations, setConversations] = useState([{ label: "", prompt: "", output: "" }]);
-  const [experts, setExperts] = useState([
-    { llm: "claude", enabled: true, name: "Risk Analyst", subtitle: "Anthropic Claude", color: theme.violet, icon: "🛡️" },
-    { llm: "gpt4o", enabled: true, name: "Governance Expert", subtitle: "OpenAI GPT-4o", color: theme.green, icon: "⚖️" },
-    { llm: "gemini", enabled: true, name: "Ethics Auditor", subtitle: "Google Gemini", color: theme.unBlueDark, icon: "🧭" },
-  ]);
-  const [frameworks, setFrameworks] = useState(["eu_ai_act", "nist", "owasp", "unesco"]);
-  const [availableFrameworks, setAvailableFrameworks] = useState([]);
-  const [activeInputTab, setActiveInputTab] = useState("manual");
-  const [apiConfig, setApiConfig] = useState({ endpoint: "", api_key: "", model: "", probe_count: 20 });
+  const docInputRef = useRef(null);
+  const [inputMethod, setInputMethod] = useState("catalog");
+  const [selectedTool, setSelectedTool] = useState("");
+  const [apiConfig, setApiConfig] = useState({ endpoint: "", api_key: "", model: "" });
   const [uploadedConversations, setUploadedConversations] = useState([]);
   const [uploadFileName, setUploadFileName] = useState("");
   const [uploadError, setUploadError] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [experts, setExperts] = useState([
+    { id: 1, llm: "claude", name: "Expert 1", model: "Claude Sonnet", company: "Anthropic", letter: "A", color: "#D97757", enabled: true },
+    { id: 2, llm: "gpt4o", name: "Expert 2", model: "GPT-4o", company: "OpenAI", letter: "⬡", color: "#10A37F", enabled: true },
+    { id: 3, llm: "gemini", name: "Expert 3", model: "Gemini Pro", company: "Google", letter: "G", color: "#4285F4", enabled: true },
+  ]);
+  const [showAddExpert, setShowAddExpert] = useState(false);
+  const [frameworks, setFrameworks] = useState([
+    { id: "eu_ai_act", label: "EU AI Act (2024)", desc: "Risk classification, transparency, high-risk system requirements", checked: true },
+    { id: "nist", label: "NIST AI RMF", desc: "Risk management, governance, fairness, accountability", checked: true },
+    { id: "unesco", label: "UNESCO AI Ethics", desc: "Human rights, fairness, transparency, proportionality", checked: true },
+    { id: "owasp", label: "OWASP Top 10 for LLMs", desc: "Prompt injection, data leakage, insecure output handling", checked: true },
+    { id: "iso42001", label: "ISO 42001", desc: "AI management system standard", checked: false },
+    { id: "unicc", label: "UNICC AI Governance", desc: "UN-specific data sovereignty, sandbox policies", checked: false },
+  ]);
+  const [uploadedDocs, setUploadedDocs] = useState([]);
 
-  useEffect(() => {
-    api.getFrameworks()
-      .then((d) => setAvailableFrameworks(d.frameworks || []))
-      .catch(() => setAvailableFrameworks([]));
-  }, []);
+  const selectedToolData = TOOL_CATALOG.find(tc => tc.id === selectedTool);
 
-  const addConversation = () =>
-    setConversations((c) => [...c, { label: "", prompt: "", output: "" }]);
-
-  const removeConversation = (i) =>
-    setConversations((c) => c.filter((_, idx) => idx !== i));
-
-  const updateConversation = (i, field, value) =>
-    setConversations((c) => c.map((conv, idx) => idx === i ? { ...conv, [field]: value } : conv));
-
-  const toggleExpert = (i) =>
-    setExperts((e) => e.map((ex, idx) => idx === i ? { ...ex, enabled: !ex.enabled } : ex));
+  const toggleExpert = (id) =>
+    setExperts((e) => e.map((ex) => ex.id === id ? { ...ex, enabled: !ex.enabled } : ex));
 
   const toggleFramework = (id) =>
-    setFrameworks((f) => f.includes(id) ? f.filter((x) => x !== id) : [...f, id]);
+    setFrameworks((f) => f.map((fw) => fw.id === id ? { ...fw, checked: !fw.checked } : fw));
 
   // ── File parsing helpers ──────────────────────────────────────────────────
 
@@ -194,27 +173,28 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
 
   // ── Submission ────────────────────────────────────────────────────────────
 
-  const canSubmit = agentName.trim() && experts.some((e) => e.enabled) && (
-    (activeInputTab === "manual" && conversations.some((c) => c.prompt.trim() && c.output.trim())) ||
-    (activeInputTab === "api" && apiConfig.endpoint.trim() && apiConfig.model.trim()) ||
-    (activeInputTab === "upload" && uploadedConversations.length > 0)
+  const canSubmit = experts.some((e) => e.enabled) && (
+    (inputMethod === "catalog" && selectedTool !== "") ||
+    (inputMethod === "api" && apiConfig.endpoint.trim() !== "") ||
+    (inputMethod === "upload" && uploadedConversations.length > 0)
   );
 
   const handleSubmit = () => {
     if (!canSubmit || submitting) return;
+    const agentName = inputMethod === "catalog"
+      ? (selectedToolData?.name || selectedTool)
+      : inputMethod === "api"
+        ? (apiConfig.model || "API Agent")
+        : (uploadFileName || "Uploaded Agent");
     const base = {
       agent_name: agentName,
-      use_case: useCase,
-      system_prompt: systemPrompt,
-      environment,
-      data_sensitivity: dataSensitivity,
-      frameworks,
+      frameworks: frameworks.filter((f) => f.checked).map((f) => f.id),
       experts: experts.map(({ llm, enabled }) => ({ llm, enabled })),
     };
-    if (activeInputTab === "manual") {
-      onSubmit({ ...base, conversations: conversations.filter((c) => c.prompt.trim() && c.output.trim()), input_method: "manual" });
-    } else if (activeInputTab === "api") {
-      onSubmit({ ...base, conversations: [], input_method: "api_probe", api_config: { endpoint: apiConfig.endpoint, api_key: apiConfig.api_key, model: apiConfig.model, probe_count: apiConfig.probe_count } });
+    if (inputMethod === "catalog") {
+      onSubmit({ ...base, conversations: [], input_method: "api_probe", api_config: { tool_id: selectedTool } });
+    } else if (inputMethod === "api") {
+      onSubmit({ ...base, conversations: [], input_method: "api_probe", api_config: { endpoint: apiConfig.endpoint, api_key: apiConfig.api_key, model: apiConfig.model } });
     } else {
       onSubmit({ ...base, conversations: uploadedConversations, input_method: "upload" });
     }
@@ -232,382 +212,191 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
     transition: theme.transition,
   };
 
+  const activeExperts = experts.filter((e) => e.enabled).length;
+  const selectedFrameworks = frameworks.filter((f) => f.checked).length;
+
   return (
     <div>
       {/* Page header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ fontFamily: theme.fontSerif, fontSize: 32, fontWeight: 400, color: theme.text, marginBottom: 6 }}>
-            Council of Experts
+          <h1 style={{ fontFamily: theme.fontSerif, fontSize: 30, fontWeight: 400, color: theme.text, marginBottom: 4, letterSpacing: "-0.02em" }}>
+            Council of Experts — AI Safety Evaluation
           </h1>
-          <p style={{ fontSize: 15, color: theme.textSec }}>AI Safety Evaluation — Submit your agent for multi-expert review</p>
+          <p style={{ fontSize: 14, color: theme.textTer }}>Three independent LLMs evaluate the same agent using a unified rubric, then debate their findings</p>
         </div>
         <button
           onClick={onDemoLoad}
           disabled={submitting}
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "10px 20px",
-            background: theme.violetPale,
-            color: theme.violet,
-            border: `1.5px solid ${theme.violetBorder}`,
-            borderRadius: theme.radiusFull,
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 600,
+            padding: "10px 20px",
+            borderRadius: 8,
+            border: `1px solid ${theme.unBlue}33`,
             cursor: submitting ? "wait" : "pointer",
-            transition: theme.transition,
+            background: theme.unBluePale,
+            color: theme.unBlueDark,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "#E0D0F0"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = theme.violetPale; }}
         >
-          ⚡ Load Demo
+          ▶ Test Demo
         </button>
       </div>
 
-      {/* Agent Info */}
-      <SectionCard title="Agent Information" subtitle="Describe the AI agent you want to evaluate">
-        <div style={{ display: "grid", gap: 16 }}>
-          <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: theme.text, display: "block", marginBottom: 6 }}>
-              Agent Name <span style={{ color: theme.red }}>*</span>
-            </label>
-            <input
-              value={agentName}
-              onChange={(e) => setAgentName(e.target.value)}
-              placeholder="e.g. WFP Customer Support Bot v2.1"
-              style={inputStyle}
-              onFocus={(e) => { e.target.style.borderColor = theme.violet; }}
-              onBlur={(e) => { e.target.style.borderColor = theme.border; }}
-            />
-          </div>
+      {/* ── SECTION 1: Choose a Tool ──────────────────────────────────────── */}
+      <div style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 28, marginBottom: 16 }}>
+        <SectionHead num="1" title="Choose a Tool to Evaluate" />
 
-          <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: theme.text, display: "block", marginBottom: 6 }}>Use Case</label>
-            <textarea
-              value={useCase}
-              onChange={(e) => setUseCase(e.target.value)}
-              placeholder="Describe what this agent does, who it serves, and what decisions it makes or influences..."
-              rows={3}
-              style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }}
-              onFocus={(e) => { e.target.style.borderColor = theme.violet; }}
-              onBlur={(e) => { e.target.style.borderColor = theme.border; }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: theme.text, display: "block", marginBottom: 6 }}>System Prompt</label>
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="Paste the agent's system prompt here..."
-              rows={5}
-              style={{ ...inputStyle, fontFamily: theme.fontMono, fontSize: 13, resize: "vertical", lineHeight: 1.6 }}
-              onFocus={(e) => { e.target.style.borderColor = theme.violet; }}
-              onBlur={(e) => { e.target.style.borderColor = theme.border; }}
-            />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div>
-              <label style={{ fontSize: 13, fontWeight: 600, color: theme.text, display: "block", marginBottom: 6 }}>Deployment Environment</label>
-              <input
-                value={environment}
-                onChange={(e) => setEnvironment(e.target.value)}
-                placeholder="e.g. Cloud-hosted, web chat + WhatsApp"
-                style={inputStyle}
-                onFocus={(e) => { e.target.style.borderColor = theme.violet; }}
-                onBlur={(e) => { e.target.style.borderColor = theme.border; }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 13, fontWeight: 600, color: theme.text, display: "block", marginBottom: 6 }}>Data Sensitivity</label>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {["Low", "Medium", "High", "Critical"].map((level) => (
-                  <button
-                    key={level}
-                    onClick={() => setDataSensitivity(level)}
-                    style={{
-                      padding: "7px 14px",
-                      borderRadius: theme.radiusFull,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      border: `1.5px solid ${dataSensitivity === level ? theme.violet : theme.border}`,
-                      background: dataSensitivity === level ? theme.violetPale : theme.surface,
-                      color: dataSensitivity === level ? theme.violet : theme.textSec,
-                      cursor: "pointer",
-                      transition: theme.transition,
-                    }}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </SectionCard>
-
-      {/* Conversations — tabbed input methods */}
-      <SectionCard title="Conversations" subtitle="Choose how to provide conversation data for evaluation">
-
-        {/* Tab switcher */}
-        <div style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: `1px solid ${theme.border}` }}>
+        {/* Method tabs */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 20, background: theme.bgWarm, borderRadius: 10, padding: 4 }}>
           {[
-            { id: "manual", label: "✎  Manual Entry" },
-            { id: "api",    label: "⚡ Connect API" },
-            { id: "upload", label: "↑  Upload Files" },
-          ].map((tab) => (
+            { id: "catalog", icon: "📋", label: "Tool Catalog", desc: "Select from pre-loaded tools" },
+            { id: "api", icon: "🔗", label: "Connect API", desc: "Auto-probe live endpoint" },
+            { id: "upload", icon: "📄", label: "Upload Files", desc: "Batch JSON/CSV upload" },
+          ].map((m) => (
             <button
-              key={tab.id}
-              onClick={() => setActiveInputTab(tab.id)}
+              key={m.id}
+              onClick={() => setInputMethod(m.id)}
               style={{
-                padding: "9px 18px",
-                background: "none",
+                flex: 1,
+                padding: "10px 12px",
+                borderRadius: 8,
                 border: "none",
-                borderBottom: `2px solid ${activeInputTab === tab.id ? theme.violet : "transparent"}`,
-                marginBottom: -1,
-                fontSize: 13,
-                fontWeight: activeInputTab === tab.id ? 700 : 500,
-                color: activeInputTab === tab.id ? theme.violet : theme.textSec,
                 cursor: "pointer",
-                transition: theme.transition,
-                whiteSpace: "nowrap",
+                background: inputMethod === m.id ? theme.surface : "transparent",
+                color: inputMethod === m.id ? theme.text : theme.textTer,
+                fontSize: 13,
+                fontWeight: inputMethod === m.id ? 600 : 500,
+                transition: "all 0.2s",
+                boxShadow: inputMethod === m.id ? "0 1px 4px rgba(0,0,0,0.06)" : "none",
+                textAlign: "left",
               }}
             >
-              {tab.label}
+              {m.icon} {m.label}<br /><span style={{ fontSize: 11, fontWeight: 400, color: theme.textTer }}>{m.desc}</span>
             </button>
           ))}
         </div>
 
-        {/* ── Manual Entry ── */}
-        {activeInputTab === "manual" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {conversations.map((conv, i) => (
-              <div
-                key={i}
-                style={{ border: `1px solid ${theme.borderSubtle}`, borderRadius: theme.radius, overflow: "hidden" }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "10px 14px",
-                    background: theme.bgWarm,
-                    borderBottom: `1px solid ${theme.borderSubtle}`,
-                  }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 600, color: theme.textSec }}>#{i + 1}</span>
-                  <input
-                    value={conv.label}
-                    onChange={(e) => updateConversation(i, "label", e.target.value)}
-                    placeholder="Label (e.g. Normal inquiry, Adversarial test)"
-                    style={{ flex: 1, margin: "0 12px", padding: "4px 8px", border: `1px solid ${theme.border}`, borderRadius: 4, fontSize: 13, background: theme.surface, color: theme.text, outline: "none" }}
-                  />
-                  {conversations.length > 1 && (
-                    <button
-                      onClick={() => removeConversation(i)}
-                      style={{ background: "none", border: "none", color: theme.textTer, fontSize: 16, cursor: "pointer", padding: "2px 6px", borderRadius: 4 }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = theme.red; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = theme.textTer; }}
-                    >✕</button>
-                  )}
-                </div>
-                <div style={{ padding: 14, display: "grid", gap: 10 }}>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 4 }}>USER INPUT</label>
-                    <textarea value={conv.prompt} onChange={(e) => updateConversation(i, "prompt", e.target.value)} placeholder="What the user sent to the agent..." rows={3} style={{ ...inputStyle, fontSize: 13, resize: "vertical", lineHeight: 1.5 }} onFocus={(e) => { e.target.style.borderColor = theme.violet; }} onBlur={(e) => { e.target.style.borderColor = theme.border; }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 4 }}>AGENT OUTPUT</label>
-                    <textarea value={conv.output} onChange={(e) => updateConversation(i, "output", e.target.value)} placeholder="What the agent responded..." rows={3} style={{ ...inputStyle, fontSize: 13, resize: "vertical", lineHeight: 1.5 }} onFocus={(e) => { e.target.style.borderColor = theme.violet; }} onBlur={(e) => { e.target.style.borderColor = theme.border; }} />
-                  </div>
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={addConversation}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", background: "none", border: `1.5px dashed ${theme.border}`, borderRadius: theme.radius, fontSize: 13, fontWeight: 600, color: theme.textSec, cursor: "pointer", transition: theme.transition }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.violet; e.currentTarget.style.color = theme.violet; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSec; }}
+        {/* Tool Catalog */}
+        {inputMethod === "catalog" && (
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>Select Tool</label>
+            <select
+              value={selectedTool}
+              onChange={(e) => setSelectedTool(e.target.value)}
+              style={{ ...inputStyle, cursor: "pointer", appearance: "auto" }}
             >
-              + Add Conversation
-            </button>
+              <option value="">Select a tool...</option>
+              {TOOL_CATALOG.map((tool) => (
+                <option key={tool.id} value={tool.id}>{tool.name}</option>
+              ))}
+            </select>
+            {selectedToolData && (
+              <p style={{ fontSize: 13, color: theme.textSec, margin: "10px 0 0", lineHeight: 1.5 }}>{selectedToolData.desc}</p>
+            )}
+
           </div>
         )}
 
-        {/* ── Connect API ── */}
-        {activeInputTab === "api" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Connect API */}
+        {inputMethod === "api" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ padding: 16, background: theme.unBluePale, borderRadius: 10, border: `1px solid ${theme.unBlue}22` }}>
+              <p style={{ fontSize: 13, color: theme.unBlueDark, margin: 0 }}>
+                🔗 <strong>Live API Probing:</strong> SafeCouncil connects to your AI agent's API, automatically sends adversarial + normal test prompts, and evaluates the responses.
+              </p>
+            </div>
             <div>
-              <label style={{ fontSize: 13, fontWeight: 600, color: theme.text, display: "block", marginBottom: 6 }}>
-                API Endpoint URL <span style={{ color: theme.red }}>*</span>
-              </label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>API Endpoint URL</label>
               <input
                 value={apiConfig.endpoint}
                 onChange={(e) => setApiConfig({ ...apiConfig, endpoint: e.target.value })}
-                placeholder="https://api.openai.com/v1/chat/completions"
+                placeholder="https://api.example.com/v1/chat/completions"
                 style={inputStyle}
                 onFocus={(e) => { e.target.style.borderColor = theme.violet; }}
                 onBlur={(e) => { e.target.style.borderColor = theme.border; }}
               />
-              <div style={{ fontSize: 12, color: theme.textTer, marginTop: 4 }}>
-                Must be an OpenAI-compatible{" "}
-                <code style={{ fontFamily: theme.fontMono }}>/v1/chat/completions</code> endpoint
-              </div>
             </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: theme.text, display: "block", marginBottom: 6 }}>
-                  API Key
-                </label>
+                <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>API Key</label>
                 <input
                   type="password"
                   value={apiConfig.api_key}
                   onChange={(e) => setApiConfig({ ...apiConfig, api_key: e.target.value })}
-                  placeholder="sk-... (leave blank if unauthenticated)"
+                  placeholder="sk-..."
                   style={inputStyle}
                   onFocus={(e) => { e.target.style.borderColor = theme.violet; }}
                   onBlur={(e) => { e.target.style.borderColor = theme.border; }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: theme.text, display: "block", marginBottom: 6 }}>
-                  Model Name <span style={{ color: theme.red }}>*</span>
-                </label>
+                <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>Model Name</label>
                 <input
                   value={apiConfig.model}
                   onChange={(e) => setApiConfig({ ...apiConfig, model: e.target.value })}
-                  placeholder="e.g. gpt-4o, claude-3-5-sonnet-20241022"
+                  placeholder="e.g., gpt-4o, claude-sonnet"
                   style={inputStyle}
                   onFocus={(e) => { e.target.style.borderColor = theme.violet; }}
                   onBlur={(e) => { e.target.style.borderColor = theme.border; }}
                 />
               </div>
             </div>
-
-            <div>
-              <label style={{ fontSize: 13, fontWeight: 600, color: theme.text, display: "block", marginBottom: 8 }}>
-                Probe Count — how many test prompts to generate and send
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {[10, 20, 30].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setApiConfig({ ...apiConfig, probe_count: n })}
-                    style={{
-                      padding: "7px 18px",
-                      borderRadius: theme.radiusFull,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      border: `1.5px solid ${apiConfig.probe_count === n ? theme.violet : theme.border}`,
-                      background: apiConfig.probe_count === n ? theme.violetPale : theme.surface,
-                      color: apiConfig.probe_count === n ? theme.violet : theme.textSec,
-                      cursor: "pointer",
-                      transition: theme.transition,
-                    }}
-                  >
-                    {n} probes
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ background: theme.violetPale, border: `1px solid ${theme.violetBorder}`, borderRadius: theme.radius, padding: "12px 16px", fontSize: 13, color: theme.text, lineHeight: 1.6 }}>
-              <strong style={{ color: theme.violet }}>How it works:</strong> SafeCouncil will use Claude to generate{" "}
-              <strong>{apiConfig.probe_count}</strong> test prompts across 6 categories (normal, adversarial,
-              privacy, bias, edge-case, boundary) and send each one to your endpoint. The responses are then
-              evaluated by the expert council.
-            </div>
+            <p style={{ fontSize: 11, color: theme.textTer }}>🔒 API keys are used only during evaluation, never stored. All communication is encrypted end-to-end.</p>
           </div>
         )}
 
-        {/* ── Upload Files ── */}
-        {activeInputTab === "upload" && (
+        {/* Upload Files */}
+        {inputMethod === "upload" && (
           <div>
             {uploadedConversations.length === 0 ? (
-              <div>
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    border: `2px dashed ${isDragging ? theme.violet : theme.border}`,
-                    borderRadius: theme.radiusMd,
-                    padding: "48px 24px",
-                    textAlign: "center",
-                    cursor: "pointer",
-                    background: isDragging ? theme.violetPale : theme.bgWarm,
-                    transition: theme.transition,
-                  }}
-                >
-                  <input ref={fileInputRef} type="file" accept=".json,.csv" onChange={handleFileChange} style={{ display: "none" }} />
-                  <div style={{ fontSize: 32, marginBottom: 12 }}>📁</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 6 }}>
-                    Drop a file here, or click to browse
-                  </div>
-                  <div style={{ fontSize: 12, color: theme.textSec }}>
-                    Accepts <strong>.json</strong> or <strong>.csv</strong>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 14, fontSize: 12, color: theme.textTer, lineHeight: 1.7 }}>
-                  <strong>JSON:</strong>{" "}
-                  <code style={{ fontFamily: theme.fontMono, background: theme.bgWarm, padding: "1px 4px", borderRadius: 3 }}>
-                    {"[{ label, prompt, output }, ...]"}
-                  </code>{" "}
-                  or{" "}
-                  <code style={{ fontFamily: theme.fontMono, background: theme.bgWarm, padding: "1px 4px", borderRadius: 3 }}>
-                    {"{ conversations: [...] }"}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                style={{
+                  border: `2px dashed ${isDragging ? theme.violet : theme.border}`,
+                  borderRadius: 12,
+                  padding: 36,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  background: isDragging ? theme.violetPale : "transparent",
+                  transition: theme.transition,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.violet; }}
+                onMouseLeave={(e) => { if (!isDragging) e.currentTarget.style.borderColor = theme.border; }}
+              >
+                <input ref={fileInputRef} type="file" accept=".json,.csv" onChange={handleFileChange} style={{ display: "none" }} />
+                <div style={{ fontSize: 28, marginBottom: 10 }}>📄</div>
+                <p style={{ fontSize: 14, fontWeight: 600, color: theme.textSec, margin: "0 0 4px" }}>Drop conversation files here or click to upload</p>
+                <p style={{ fontSize: 12, color: theme.textTer, margin: 0 }}>JSON (array of prompt/output pairs), CSV, or TXT — max 10MB</p>
+                <p style={{ fontSize: 11, color: theme.textTer, marginTop: 8 }}>
+                  Expected format: <code style={{ fontFamily: theme.fontMono, fontSize: 11, background: theme.bgWarm, padding: "2px 6px", borderRadius: 4 }}>
+                    {`[{"label": "...", "prompt": "...", "output": "..."}]`}
                   </code>
-                  <br />
-                  <strong>CSV:</strong> Header row with{" "}
-                  <code style={{ fontFamily: theme.fontMono, background: theme.bgWarm, padding: "1px 4px", borderRadius: 3 }}>prompt</code>
-                  {" and "}
-                  <code style={{ fontFamily: theme.fontMono, background: theme.bgWarm, padding: "1px 4px", borderRadius: 3 }}>output</code>
-                  {" columns (also accepts: input/user/question and response/answer/assistant)"}
-                </div>
+                </p>
               </div>
             ) : (
-              <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: theme.greenPale, border: `1px solid ${theme.greenBorder}`, borderRadius: theme.radius, marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ color: theme.green, fontSize: 16 }}>✓</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>
-                      {uploadedConversations.length} conversation{uploadedConversations.length !== 1 ? "s" : ""} loaded from{" "}
-                      <span style={{ fontFamily: theme.fontMono, color: theme.textSec }}>{uploadFileName}</span>
-                    </span>
-                  </div>
+              <div style={{ padding: 16, background: theme.greenPale, borderRadius: 10, border: `1px solid ${theme.green}30` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: theme.green }}>✓ Loaded {uploadedConversations.length} conversations from {uploadFileName}</span>
                   <button
                     onClick={() => { setUploadedConversations([]); setUploadFileName(""); setUploadError(null); }}
-                    style={{ background: "none", border: `1px solid ${theme.greenBorder}`, borderRadius: theme.radius, padding: "4px 10px", fontSize: 12, color: theme.textSec, cursor: "pointer" }}
+                    style={{ fontSize: 12, color: theme.red, background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}
                   >
-                    Clear
+                    Remove
                   </button>
                 </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {uploadedConversations.slice(0, 4).map((c, i) => (
-                    <div key={i} style={{ background: theme.bgWarm, border: `1px solid ${theme.borderSubtle}`, borderRadius: theme.radius, padding: "10px 14px", fontSize: 13 }}>
-                      <div style={{ fontWeight: 600, color: theme.text, marginBottom: 4 }}>{c.label || `Conversation ${i + 1}`}</div>
-                      <div style={{ color: theme.textSec, fontStyle: "italic" }}>
-                        {c.prompt.length > 100 ? c.prompt.slice(0, 100) + "…" : c.prompt}
-                      </div>
-                    </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {uploadedConversations.map((c, i) => (
+                    <span key={i} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "#fff", color: theme.textSec }}>
+                      #{i + 1} {c.label || "Conversation"}
+                    </span>
                   ))}
-                  {uploadedConversations.length > 4 && (
-                    <div style={{ fontSize: 12, color: theme.textTer, textAlign: "center", padding: "6px 0" }}>
-                      + {uploadedConversations.length - 4} more conversation{uploadedConversations.length - 4 !== 1 ? "s" : ""}
-                    </div>
-                  )}
                 </div>
               </div>
             )}
-
             {uploadError && (
               <div style={{ marginTop: 12, padding: "10px 14px", background: theme.redPale, border: `1px solid ${theme.redBorder}`, borderRadius: theme.radius, fontSize: 13, color: theme.red }}>
                 {uploadError}
@@ -615,101 +404,163 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
             )}
           </div>
         )}
-      </SectionCard>
+      </div>
 
-      {/* Expert Configuration */}
-      <SectionCard title="Expert Configuration" subtitle="Each expert evaluates the same rubric independently — diversity comes from different vendor perspectives">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-          {experts.map((expert, i) => (
+      {/* ── SECTION 2: Expert Configuration ───────────────────────────────── */}
+      <div style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 28, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <SectionHead num="2" title="Expert Configuration" badge={<Badge color={theme.textTer}>{activeExperts} active</Badge>} />
+          <button
+            onClick={() => setShowAddExpert(!showAddExpert)}
+            style={{ fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 8, border: `1px solid ${theme.border}`, cursor: "pointer", background: theme.surface, color: theme.violet }}
+          >
+            + Add Expert
+          </button>
+        </div>
+        <p style={{ fontSize: 13, color: theme.textTer, margin: "-12px 0 16px", lineHeight: 1.5 }}>
+          Each expert independently evaluates the same <strong style={{ color: theme.textSec }}>unified rubric</strong> across Safety, Governance, and Trust. Multiple vendors ensure diverse perspectives.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+          {experts.map((ex) => (
             <div
-              key={expert.llm}
+              key={ex.id}
               style={{
-                border: `1.5px solid ${expert.enabled ? expert.color + "60" : theme.border}`,
-                borderRadius: theme.radiusMd,
-                padding: "16px",
-                background: expert.enabled ? theme.surface : theme.bgWarm,
-                transition: theme.transition,
-                opacity: expert.enabled ? 1 : 0.6,
+                borderRadius: 12,
+                padding: 16,
+                border: `1px solid ${ex.enabled ? ex.color + "33" : theme.border}`,
+                background: ex.enabled ? ex.color + "08" : theme.bgWarm,
+                opacity: ex.enabled ? 1 : 0.5,
+                transition: "all 0.3s",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 8,
-                    background: expert.enabled ? expert.color + "20" : theme.border,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 18,
-                  }}
-                >
-                  {expert.icon}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <CompanyIcon letter={ex.letter} color={ex.enabled ? ex.color : theme.textTer} />
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: theme.textTer, textTransform: "uppercase", letterSpacing: 0.5 }}>{ex.name}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{ex.model}</div>
+                  </div>
                 </div>
-                <Toggle checked={expert.enabled} onChange={() => toggleExpert(i)} />
+                <Toggle checked={ex.enabled} onChange={() => toggleExpert(ex.id)} color={ex.color} />
               </div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: expert.enabled ? theme.text : theme.textTer, marginBottom: 2 }}>
-                {expert.name}
+              <div style={{ fontSize: 12, color: ex.color, fontWeight: 500 }}>{ex.company}</div>
+            </div>
+          ))}
+        </div>
+        {showAddExpert && (
+          <div style={{ marginTop: 14, padding: 18, background: theme.bgWarm, borderRadius: 12, border: `1px solid ${theme.border}` }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: theme.text, margin: "0 0 12px" }}>Add Custom Expert</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>Expert Name</label>
+                <input placeholder="e.g., Expert 4" style={inputStyle} onFocus={(e) => { e.target.style.borderColor = theme.violet; }} onBlur={(e) => { e.target.style.borderColor = theme.border; }} />
               </div>
-              <div style={{ fontSize: 12, color: expert.enabled ? expert.color : theme.textTer, fontWeight: 500 }}>
-                {expert.subtitle}
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>LLM Provider</label>
+                <select style={{ ...inputStyle, cursor: "pointer" }}>
+                  <option>Claude (Anthropic)</option>
+                  <option>GPT-4o (OpenAI)</option>
+                  <option>Gemini (Google)</option>
+                  <option>Llama (Local)</option>
+                  <option>Custom API</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>API Key</label>
+                <input type="password" placeholder="Your API key" style={inputStyle} onFocus={(e) => { e.target.style.borderColor = theme.violet; }} onBlur={(e) => { e.target.style.borderColor = theme.border; }} />
+              </div>
+            </div>
+            <button style={{ fontSize: 13, fontWeight: 600, padding: "8px 20px", borderRadius: 8, border: "none", cursor: "pointer", background: theme.violet, color: "#fff", marginTop: 12 }}>
+              Add Expert
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── SECTION 3: Governance Frameworks & Context ─────────────────────── */}
+      <div style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 28, marginBottom: 16 }}>
+        <SectionHead num="3" title="Governance Frameworks & Context" badge={<Badge color={theme.violet}>{selectedFrameworks} selected</Badge>} />
+        <p style={{ fontSize: 13, color: theme.textTer, margin: "-12px 0 16px", lineHeight: 1.5 }}>
+          Select which governance standards to evaluate against. Experts will reference these frameworks via RAG (Retrieval-Augmented Generation) to cite specific regulations in their assessments.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+          {frameworks.map((f) => (
+            <div
+              key={f.id}
+              onClick={() => toggleFramework(f.id)}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 12,
+                padding: 14,
+                borderRadius: 10,
+                border: `1px solid ${f.checked ? theme.violet + "44" : theme.borderSubtle}`,
+                background: f.checked ? theme.violetPale + "55" : theme.surface,
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 6,
+                  border: `2px solid ${f.checked ? theme.violet : theme.border}`,
+                  background: f.checked ? theme.violet : "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  marginTop: 1,
+                  transition: "all 0.2s",
+                }}
+              >
+                {f.checked && <span style={{ color: "#fff", fontSize: 12, fontWeight: 700 }}>✓</span>}
+              </div>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>{f.label}</span>
+                <p style={{ fontSize: 11, color: theme.textTer, margin: "2px 0 0" }}>{f.desc}</p>
               </div>
             </div>
           ))}
         </div>
-      </SectionCard>
 
-      {/* Governance Frameworks */}
-      <SectionCard title="Governance Frameworks" subtitle="Select which standards to evaluate against">
-        {availableFrameworks.length === 0 ? (
-          <div style={{ color: theme.textSec, fontSize: 13 }}>Loading frameworks...</div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10 }}>
-            {availableFrameworks.map((fw) => (
-              <label
-                key={fw.id}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 10,
-                  padding: "12px 14px",
-                  border: `1.5px solid ${frameworks.includes(fw.id) ? theme.violetBorder : theme.border}`,
-                  borderRadius: theme.radius,
-                  background: frameworks.includes(fw.id) ? theme.violetPale : theme.surface,
-                  cursor: "pointer",
-                  transition: theme.transition,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={frameworks.includes(fw.id)}
-                  onChange={() => toggleFramework(fw.id)}
-                  style={{ marginTop: 2, accentColor: theme.violet, flexShrink: 0 }}
-                />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>{fw.label}</div>
-                  <div style={{ fontSize: 12, color: theme.textSec, marginTop: 2 }}>{fw.description}</div>
-                </div>
-              </label>
-            ))}
+        {/* Custom governance doc upload */}
+        <div style={{ borderTop: `1px solid ${theme.borderSubtle}`, paddingTop: 18 }}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 8 }}>Upload Custom Governance Documents (Optional)</label>
+          <p style={{ fontSize: 12, color: theme.textTer, margin: "0 0 12px" }}>Upload your organization's internal AI policies. These will be injected into expert prompts as additional evaluation context via RAG.</p>
+          <div
+            style={{ border: `1px dashed ${theme.border}`, borderRadius: 10, padding: 20, textAlign: "center", cursor: "pointer" }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.violet; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; }}
+            onClick={() => docInputRef.current?.click()}
+          >
+            <input ref={docInputRef} type="file" accept=".pdf,.docx,.txt" style={{ display: "none" }} onChange={(e) => {
+              if (e.target.files[0]) setUploadedDocs((d) => [...d, e.target.files[0].name]);
+            }} />
+            <p style={{ fontSize: 13, color: theme.textSec, margin: 0 }}>📎 Drop policy documents here — PDF, DOCX, TXT</p>
           </div>
-        )}
-      </SectionCard>
+          {uploadedDocs.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+              {uploadedDocs.map((doc, i) => (
+                <span key={i} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, background: theme.violetPale, color: theme.violet, fontWeight: 500 }}>
+                  📎 {doc}
+                  <button
+                    onClick={() => setUploadedDocs((d) => d.filter((_, idx) => idx !== i))}
+                    style={{ background: "none", border: "none", color: theme.violet, cursor: "pointer", marginLeft: 4, fontWeight: 700 }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
-      {/* Submit */}
+      {/* ── Submission ─────────────────────────────────────────────────────── */}
       {submitError && (
-        <div
-          style={{
-            background: theme.redPale,
-            border: `1px solid ${theme.redBorder}`,
-            borderRadius: theme.radius,
-            padding: "12px 16px",
-            color: theme.red,
-            fontSize: 14,
-            marginBottom: 16,
-          }}
-        >
+        <div style={{ background: theme.redPale, border: `1px solid ${theme.redBorder}`, borderRadius: theme.radius, padding: "12px 16px", color: theme.red, fontSize: 14, marginBottom: 16 }}>
           <strong>Error:</strong> {submitError}
           {submitError.includes("connect") && (
             <div style={{ marginTop: 4, fontSize: 13, color: theme.textSec }}>
@@ -719,30 +570,31 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ textAlign: "center", padding: "20px 0" }}>
         <button
           onClick={handleSubmit}
           disabled={!canSubmit || submitting}
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "14px 32px",
-            background: canSubmit && !submitting ? theme.violet : theme.border,
-            color: canSubmit && !submitting ? "#fff" : theme.textTer,
+            fontSize: 16,
+            fontWeight: 600,
+            padding: "16px 48px",
+            borderRadius: 12,
             border: "none",
-            borderRadius: theme.radiusFull,
-            fontSize: 15,
-            fontWeight: 700,
             cursor: canSubmit && !submitting ? "pointer" : "not-allowed",
+            background: canSubmit && !submitting ? theme.violet : theme.border,
+            color: "#fff",
+            boxShadow: canSubmit && !submitting ? "0 4px 20px rgba(87,6,140,0.25)" : "none",
+            opacity: canSubmit && !submitting ? 1 : 0.5,
             transition: theme.transition,
-            boxShadow: canSubmit && !submitting ? "0 4px 14px rgba(87,6,140,0.3)" : "none",
           }}
           onMouseEnter={(e) => { if (canSubmit && !submitting) e.currentTarget.style.background = theme.violetHover; }}
           onMouseLeave={(e) => { if (canSubmit && !submitting) e.currentTarget.style.background = theme.violet; }}
         >
           {submitting ? "Starting evaluation..." : "Run Council Evaluation →"}
         </button>
+        <p style={{ fontSize: 12, color: theme.textTer, marginTop: 8 }}>
+          {activeExperts} expert{activeExperts !== 1 ? "s" : ""} × {selectedFrameworks} framework{selectedFrameworks !== 1 ? "s" : ""}
+        </p>
       </div>
     </div>
   );
@@ -760,13 +612,13 @@ function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onCo
     // ── Demo mode: fake step-by-step progress with timeouts ───────────────
     if (demoMode) {
       const STEPS = [
-        "Retrieving governance context",
-        "Risk Analyst (Claude) evaluating",
-        "Governance Expert (GPT-4o) evaluating",
-        "Ethics Auditor (Gemini) evaluating",
-        "Cross-critique round",
+        "Retrieving governance context (RAG)",
+        "Expert 1 (Claude) evaluating...",
+        "Expert 2 (GPT-4o) evaluating...",
+        "Expert 3 (Gemini) evaluating...",
+        "Cross-critique: Experts reviewing each other",
         "Council debate & synthesis",
-        "Generating final verdict",
+        "Generating final verdict & mitigations",
       ];
 
       const snap = (runIdx, pct, msg) => ({
@@ -779,13 +631,13 @@ function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onCo
       });
 
       const schedule = [
-        [0,     snap(0, 5,  "Retrieving governance context...")],
-        [950,   snap(1, 12, "Risk Analyst (Claude) evaluating...")],
-        [2900,  snap(2, 28, "Governance Expert (GPT-4o) evaluating...")],
-        [4800,  snap(3, 45, "Ethics Auditor (Gemini) evaluating...")],
-        [6700,  snap(4, 64, "Cross-critique round...")],
+        [0,     snap(0, 5,  "Retrieving governance context (RAG)...")],
+        [950,   snap(1, 12, "Expert 1 (Claude) evaluating...")],
+        [2900,  snap(2, 28, "Expert 2 (GPT-4o) evaluating...")],
+        [4800,  snap(3, 45, "Expert 3 (Gemini) evaluating...")],
+        [6700,  snap(4, 64, "Cross-critique: Experts reviewing each other...")],
         [8300,  snap(5, 82, "Council debate & synthesis...")],
-        [10100, snap(6, 94, "Generating final verdict...")],
+        [10100, snap(6, 94, "Generating final verdict & mitigations...")],
         [11200, {
           progress: 100,
           current_step: "Evaluation complete",
@@ -961,763 +813,24 @@ function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onCo
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RESULTS PHASE — Tab: Overview
-// ─────────────────────────────────────────────────────────────────────────────
-
-function categoryAvg(dimensionScores, categoryName) {
-  const dims = dimensionScores.filter((d) => d.category === categoryName);
-  if (!dims.length) return null;
-  return Math.round(dims.reduce((s, d) => s + d.score, 0) / dims.length);
-}
-
-function ExpertCard({ assessment }) {
-  const topFindings = (assessment.findings || []).slice(0, 3);
-  const safetyAvg = categoryAvg(assessment.dimension_scores || [], "Safety");
-  const govAvg = categoryAvg(assessment.dimension_scores || [], "Governance & Compliance");
-  const trustAvg = categoryAvg(assessment.dimension_scores || [], "Transparency & Accountability");
-  const fairAvg = categoryAvg(assessment.dimension_scores || [], "Fairness & Ethics");
-  const privAvg = categoryAvg(assessment.dimension_scores || [], "Privacy & Data");
-
-  const color = getSpeakerColor(assessment.expert_name);
-  const scoreColor = getScoreColor(assessment.overall_score);
-
-  return (
-    <div
-      style={{
-        flex: 1,
-        minWidth: 220,
-        background: theme.surface,
-        border: `1px solid ${theme.border}`,
-        borderTop: `3px solid ${color}`,
-        borderRadius: theme.radiusMd,
-        overflow: "hidden",
-      }}
-    >
-      <div style={{ padding: "20px 20px 16px" }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-          {assessment.expert_name}
-        </div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 12 }}>
-          <div style={{ fontSize: 40, fontWeight: 800, fontFamily: theme.fontMono, color: scoreColor, lineHeight: 1 }}>
-            {assessment.overall_score}
-          </div>
-          <div style={{ marginBottom: 4 }}>
-            <div style={{ fontSize: 13, color: theme.textTer }}>/100</div>
-            <VerdictBadge verdict={assessment.verdict} size="sm" />
-          </div>
-        </div>
-
-        {/* Category bars */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {[
-            ["Safety", safetyAvg],
-            ["Privacy & Data", privAvg],
-            ["Fairness & Ethics", fairAvg],
-            ["Transparency", trustAvg],
-            ["Governance", govAvg],
-          ].filter(([, v]) => v !== null).map(([label, val]) => (
-            <div key={label}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: theme.textSec, marginBottom: 3 }}>
-                <span>{label}</span>
-                <span style={{ fontFamily: theme.fontMono, fontWeight: 600, color: getScoreColor(val) }}>{val}</span>
-              </div>
-              <ScoreBar score={val} showLabel={false} height={4} compact />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {topFindings.length > 0 && (
-        <div style={{ borderTop: `1px solid ${theme.borderSubtle}`, padding: "12px 20px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-            Top Findings
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {topFindings.map((f, i) => (
-              <div key={i} style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-                <SeverityBadge severity={f.severity} />
-                <span style={{ fontSize: 12, color: theme.textSec, lineHeight: 1.4 }}>{f.dimension}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OverviewTab({ result }) {
-  return (
-    <div>
-      {/* Expert cards */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
-        {(result.expert_assessments || []).map((a) => (
-          <ExpertCard key={a.expert_name} assessment={a} />
-        ))}
-      </div>
-
-      {/* Agreements & Disagreements */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        {result.agreements?.length > 0 && (
-          <div style={{ background: theme.greenPale, border: `1px solid ${theme.greenBorder}`, borderRadius: theme.radiusMd, padding: "20px" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: theme.green, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-              ✓ Council Agreements
-            </div>
-            <ul style={{ paddingLeft: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-              {result.agreements.map((a, i) => (
-                <li key={i} style={{ fontSize: 13, color: theme.text, lineHeight: 1.5 }}>{typeof a === "string" ? a : a.point || JSON.stringify(a)}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {result.disagreements?.length > 0 && (
-          <div style={{ background: theme.amberPale, border: `1px solid ${theme.amberBorder}`, borderRadius: theme.radiusMd, padding: "20px" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: theme.amber, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-              ⚡ Points of Contention
-            </div>
-            <ul style={{ paddingLeft: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-              {result.disagreements.map((d, i) => (
-                <li key={i} style={{ fontSize: 13, color: theme.text, lineHeight: 1.5 }}>
-                  {typeof d === "string" ? d : d.topic ? `${d.topic}: ${d.resolution || ""}` : JSON.stringify(d)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESULTS PHASE — Tab: Score Comparison
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ScoreComparisonTab({ result }) {
-  const assessments = result.expert_assessments || [];
-  if (!assessments.length) return <p style={{ color: theme.textSec }}>No assessment data available.</p>;
-
-  // Collect all dimensions across all experts
-  const allDimensions = [];
-  const seen = new Set();
-  for (const a of assessments) {
-    for (const d of (a.dimension_scores || [])) {
-      if (!seen.has(d.dimension)) {
-        seen.add(d.dimension);
-        allDimensions.push({ dimension: d.dimension, category: d.category });
-      }
-    }
-  }
-
-  // Group by category
-  const byCategory = {};
-  for (const d of allDimensions) {
-    if (!byCategory[d.category]) byCategory[d.category] = [];
-    byCategory[d.category].push(d.dimension);
-  }
-
-  const getDimScore = (assessment, dimension) => {
-    const ds = (assessment.dimension_scores || []).find((d) => d.dimension === dimension);
-    return ds ? ds.score : null;
-  };
-
-  const expertColors = assessments.map((a) => getSpeakerColor(a.expert_name));
-
-  return (
-    <div>
-      {/* Expert legend */}
-      <div style={{ display: "flex", gap: 20, marginBottom: 20, flexWrap: "wrap" }}>
-        {assessments.map((a, i) => (
-          <div key={a.expert_name} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: expertColors[i] }} />
-            <span style={{ fontSize: 13, color: theme.textSec }}>{a.expert_name}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Dimension table */}
-      <div style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radiusMd, overflow: "hidden" }}>
-        {Object.entries(byCategory).map(([category, dimensions], catIdx) => (
-          <div key={category}>
-            <div
-              style={{
-                padding: "10px 16px",
-                background: theme.bgWarm,
-                borderTop: catIdx > 0 ? `1px solid ${theme.border}` : "none",
-              }}
-            >
-              <span style={{ fontSize: 11, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                {category}
-              </span>
-            </div>
-            {dimensions.map((dim, dimIdx) => (
-              <div
-                key={dim}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: `200px repeat(${assessments.length}, 1fr)`,
-                  borderTop: `1px solid ${theme.borderSubtle}`,
-                  padding: "10px 16px",
-                  alignItems: "center",
-                  gap: 12,
-                  background: dimIdx % 2 === 1 ? theme.bgWarm + "60" : theme.surface,
-                }}
-              >
-                <div style={{ fontSize: 13, color: theme.text, fontWeight: 500 }}>{dim}</div>
-                {assessments.map((a, i) => {
-                  const score = getDimScore(a, dim);
-                  return (
-                    <div key={a.expert_name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ flex: 1, height: 6, background: theme.border, borderRadius: 3, overflow: "hidden" }}>
-                        {score !== null && (
-                          <div
-                            style={{
-                              width: `${score}%`,
-                              height: "100%",
-                              background: expertColors[i],
-                              borderRadius: 3,
-                              opacity: 0.8,
-                            }}
-                          />
-                        )}
-                      </div>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          fontFamily: theme.fontMono,
-                          color: score !== null ? getScoreColor(score) : theme.textTer,
-                          minWidth: 28,
-                          textAlign: "right",
-                        }}
-                      >
-                        {score !== null ? score : "—"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESULTS PHASE — Tab: Expert Debate
-// ─────────────────────────────────────────────────────────────────────────────
-
-function DebateTab({ result }) {
-  const [filter, setFilter] = useState("All");
-  const messages = result.debate_transcript || [];
-
-  const speakers = ["All", ...new Set(
-    messages.filter((m) => m.message_type !== "resolution" && m.speaker !== "Council").map((m) => m.speaker)
-  )];
-
-  const filtered = filter === "All" ? messages : messages.filter(
-    (m) => m.speaker === filter || m.message_type === "resolution" || m.speaker === "Council"
-  );
-
-  // Group messages to detect topic changes
-  let lastTopic = null;
-
-  return (
-    <div>
-      {/* Filter buttons */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        {speakers.map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            style={{
-              padding: "6px 14px",
-              borderRadius: theme.radiusFull,
-              fontSize: 13,
-              fontWeight: 600,
-              border: `1.5px solid ${filter === s ? getSpeakerColor(s) || theme.violet : theme.border}`,
-              background: filter === s ? (getSpeakerColor(s) || theme.violet) + "15" : theme.surface,
-              color: filter === s ? getSpeakerColor(s) || theme.violet : theme.textSec,
-              cursor: "pointer",
-              transition: theme.transition,
-            }}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
-      {messages.length === 0 && (
-        <div style={{ textAlign: "center", padding: 40, color: theme.textSec }}>
-          No debate transcript available for this evaluation.
-        </div>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {filtered.map((msg, i) => {
-          const showTopicDivider = msg.topic && msg.topic !== lastTopic;
-          if (showTopicDivider) lastTopic = msg.topic;
-          const speakerColor = getSpeakerColor(msg.speaker);
-          const isResolution = msg.message_type === "resolution" || msg.speaker === "Council";
-
-          return (
-            <div key={i}>
-              {showTopicDivider && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    margin: "20px 0 12px",
-                  }}
-                >
-                  <div style={{ flex: 1, height: 1, background: theme.border }} />
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: theme.violet,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      background: theme.violetPale,
-                      padding: "4px 12px",
-                      borderRadius: theme.radiusFull,
-                      border: `1px solid ${theme.violetBorder}`,
-                    }}
-                  >
-                    {msg.topic}
-                  </span>
-                  <div style={{ flex: 1, height: 1, background: theme.border }} />
-                </div>
-              )}
-
-              {isResolution ? (
-                <div
-                  style={{
-                    background: theme.violetPale,
-                    border: `1px solid ${theme.violetBorder}`,
-                    borderRadius: theme.radiusMd,
-                    padding: "16px 20px",
-                    marginBottom: 8,
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 700, color: theme.violet, marginBottom: 8 }}>
-                    🏛️ Council Resolution:
-                  </div>
-                  <p style={{ fontSize: 14, color: theme.text, lineHeight: 1.6 }}>{msg.message}</p>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 12,
-                    padding: "12px 0",
-                    borderBottom: `1px solid ${theme.borderSubtle}`,
-                    alignItems: "flex-start",
-                  }}
-                >
-                  {/* Avatar */}
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "50%",
-                      background: speakerColor + "20",
-                      border: `2px solid ${speakerColor}`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                      fontSize: 14,
-                      fontWeight: 700,
-                      color: speakerColor,
-                    }}
-                  >
-                    {(msg.speaker || "?")[0]}
-                  </div>
-
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: speakerColor }}>
-                        {msg.speaker}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          padding: "1px 6px",
-                          borderRadius: 3,
-                          background: theme.bgWarm,
-                          color: theme.textTer,
-                          fontWeight: 500,
-                        }}
-                      >
-                        {msg.message_type}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: 14, color: theme.text, lineHeight: 1.6 }}>{msg.message}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESULTS PHASE — Tab: All Findings
-// ─────────────────────────────────────────────────────────────────────────────
-
-const SEVERITY_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-
-function FindingsTab({ result }) {
-  const assessments = result.expert_assessments || [];
-  const hasFocus = { CRITICAL: "#8B1A1A", HIGH: theme.redBorder, MEDIUM: theme.amberBorder, LOW: theme.border };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {assessments.map((a) => {
-        const findings = [...(a.findings || [])].sort(
-          (x, y) => (SEVERITY_ORDER[x.severity] ?? 4) - (SEVERITY_ORDER[y.severity] ?? 4)
-        );
-        const color = getSpeakerColor(a.expert_name);
-
-        return (
-          <div key={a.expert_name}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-              <span style={{ fontSize: 14, fontWeight: 700, color }}>{a.expert_name}</span>
-              <span style={{ fontSize: 12, color: theme.textTer }}>{findings.length} finding{findings.length !== 1 ? "s" : ""}</span>
-            </div>
-
-            {findings.length === 0 && (
-              <div
-                style={{
-                  padding: "16px",
-                  background: theme.greenPale,
-                  border: `1px solid ${theme.greenBorder}`,
-                  borderRadius: theme.radius,
-                  fontSize: 13,
-                  color: theme.green,
-                }}
-              >
-                ✓ No findings raised by this expert
-              </div>
-            )}
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {findings.map((f, i) => (
-                <div
-                  key={i}
-                  style={{
-                    background: theme.surface,
-                    border: `1px solid ${theme.border}`,
-                    borderLeft: `4px solid ${hasFocus[f.severity] || theme.border}`,
-                    borderRadius: theme.radius,
-                    padding: "14px 16px",
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <div style={{ flexShrink: 0, marginTop: 2 }}>
-                    <SeverityBadge severity={f.severity} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: theme.text, marginBottom: 4 }}>
-                      {f.dimension}
-                    </div>
-                    <div style={{ fontSize: 13, color: theme.textSec, lineHeight: 1.5, marginBottom: f.evidence ? 6 : 0 }}>
-                      {f.text}
-                    </div>
-                    {f.evidence && (
-                      <div style={{ fontSize: 12, color: theme.textTer, fontStyle: "italic" }}>
-                        Evidence: {f.evidence}
-                        {f.framework_ref && <span style={{ marginLeft: 8, color: theme.unBlueDark, fontStyle: "normal", fontWeight: 600 }}>{f.framework_ref}</span>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESULTS PHASE — Tab: Action Items
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ActionItemsTab({ result, onNewEvaluation }) {
-  const mitigations = result.mitigations || [];
-  const priorityColors = {
-    P0: { bg: "#2D0A0A", text: "#FF6B6B", border: "#8B2020" },
-    P1: { bg: theme.redPale, text: theme.red, border: theme.redBorder },
-    P2: { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder },
-    P3: { bg: "#F0F0F5", text: theme.textSec, border: theme.border },
-  };
-
-  return (
-    <div>
-      {mitigations.length === 0 && (
-        <div style={{ textAlign: "center", padding: 40, color: theme.textSec }}>
-          No action items generated.
-        </div>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 32 }}>
-        {mitigations.map((m, i) => {
-          const pc = priorityColors[m.priority] || priorityColors.P3;
-          return (
-            <div
-              key={i}
-              style={{
-                background: theme.surface,
-                border: `1px solid ${theme.border}`,
-                borderRadius: theme.radius,
-                padding: "14px 16px",
-                display: "flex",
-                gap: 14,
-                alignItems: "flex-start",
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-flex",
-                  padding: "3px 8px",
-                  borderRadius: 4,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  fontFamily: theme.fontMono,
-                  background: pc.bg,
-                  color: pc.text,
-                  border: `1px solid ${pc.border}`,
-                  flexShrink: 0,
-                  marginTop: 1,
-                }}
-              >
-                {m.priority}
-              </span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, color: theme.text, lineHeight: 1.5, marginBottom: 6 }}>{m.text}</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <Badge label={m.owner} preset="blue" style={{ fontSize: 11 }} />
-                  {m.expert_consensus && (
-                    <span style={{ fontSize: 12, color: theme.textTer, alignSelf: "center" }}>{m.expert_consensus}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Action buttons */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", borderTop: `1px solid ${theme.border}`, paddingTop: 20 }}>
-        <button
-          onClick={() => alert("PDF export coming soon. See backend/logs/ for the full JSON audit log.")}
-          style={{
-            padding: "10px 20px",
-            background: theme.surface,
-            border: `1.5px solid ${theme.border}`,
-            borderRadius: theme.radiusFull,
-            fontSize: 14,
-            fontWeight: 600,
-            color: theme.textSec,
-            cursor: "pointer",
-            transition: theme.transition,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.violet; e.currentTarget.style.color = theme.violet; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSec; }}
-        >
-          Export Report (PDF)
-        </button>
-        <button
-          onClick={() => alert("Share link copied! (Feature coming soon)")}
-          style={{
-            padding: "10px 20px",
-            background: theme.surface,
-            border: `1.5px solid ${theme.border}`,
-            borderRadius: theme.radiusFull,
-            fontSize: 14,
-            fontWeight: 600,
-            color: theme.textSec,
-            cursor: "pointer",
-            transition: theme.transition,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.unBlueDark; e.currentTarget.style.color = theme.unBlueDark; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSec; }}
-        >
-          Share with Team
-        </button>
-        <button
-          onClick={onNewEvaluation}
-          style={{
-            padding: "10px 20px",
-            background: theme.violet,
-            color: "#fff",
-            border: "none",
-            borderRadius: theme.radiusFull,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: theme.transition,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = theme.violetHover; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = theme.violet; }}
-        >
-          + New Evaluation
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESULTS PHASE — Container
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ResultsPhase({ result, onNewEvaluation }) {
-  const [activeTab, setActiveTab] = useState("overview");
-  const verdict = result.verdict || {};
-  const verdictColors = {
-    GO: { bg: theme.greenPale, text: theme.green, border: theme.greenBorder },
-    CONDITIONAL: { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder },
-    "NO-GO": { bg: theme.redPale, text: theme.red, border: theme.redBorder },
-  };
-  const vc = verdictColors[verdict.final_verdict] || verdictColors.CONDITIONAL;
-
-  const TABS = [
-    { id: "overview", label: "Overview" },
-    { id: "scores", label: "Score Comparison" },
-    { id: "debate", label: "Expert Debate ✦" },
-    { id: "findings", label: "All Findings" },
-    { id: "actions", label: "Action Items" },
-  ];
-
-  return (
-    <div>
-      {/* Verdict banner */}
-      <div
-        style={{
-          background: vc.bg,
-          border: `1px solid ${vc.border}`,
-          borderRadius: theme.radiusMd,
-          padding: "24px 28px",
-          marginBottom: 28,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 16,
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: vc.text, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-            Council Final Verdict
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <VerdictBadge verdict={verdict.final_verdict} size="xl" />
-            <div>
-              <div style={{ fontSize: 24, fontWeight: 800, fontFamily: theme.fontMono, color: vc.text, lineHeight: 1 }}>
-                {verdict.confidence}%
-              </div>
-              <div style={{ fontSize: 12, color: vc.text, opacity: 0.8 }}>confidence</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 24, fontWeight: 800, fontFamily: theme.fontMono, color: vc.text, lineHeight: 1 }}>
-                {verdict.agreement_rate}%
-              </div>
-              <div style={{ fontSize: 12, color: vc.text, opacity: 0.8 }}>agreement</div>
-            </div>
-          </div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 12, color: theme.textSec }}>{result.agent_name}</div>
-          <div style={{ fontSize: 11, color: theme.textTer, fontFamily: theme.fontMono }}>
-            ID: {result.eval_id}
-          </div>
-          {result.audit && (
-            <div style={{ fontSize: 11, color: theme.textTer, marginTop: 4 }}>
-              {result.audit.total_api_calls} calls · {result.audit.evaluation_time_seconds?.toFixed(0)}s · ${result.audit.total_cost_usd?.toFixed(4)}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: 2,
-          marginBottom: 24,
-          borderBottom: `2px solid ${theme.border}`,
-          overflowX: "auto",
-        }}
-      >
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: "10px 18px",
-              background: "none",
-              border: "none",
-              borderBottom: `2px solid ${activeTab === tab.id ? theme.violet : "transparent"}`,
-              marginBottom: -2,
-              fontSize: 14,
-              fontWeight: activeTab === tab.id ? 700 : 500,
-              color: activeTab === tab.id ? theme.violet : theme.textSec,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              transition: theme.transition,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab content */}
-      {activeTab === "overview" && <OverviewTab result={result} />}
-      {activeTab === "scores" && <ScoreComparisonTab result={result} />}
-      {activeTab === "debate" && <DebateTab result={result} />}
-      {activeTab === "findings" && <FindingsTab result={result} />}
-      {activeTab === "actions" && <ActionItemsTab result={result} onNewEvaluation={onNewEvaluation} />}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN PAGE
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function EvaluatorPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const [phase, setPhase] = useState("input"); // "input" | "evaluating" | "results"
+  const [phase, setPhase] = useState("input"); // "input" | "evaluating"
   const [evalId, setEvalId] = useState(null);
-  const [result, setResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [evalMeta, setEvalMeta] = useState({ agentName: "", numConversations: 0, numExperts: 0 });
   const [evalError, setEvalError] = useState(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
 
-  // On mount: check for ?id= param to load a past evaluation
+  // On mount: check for ?demo= param to trigger demo mode
   useEffect(() => {
-    const id = searchParams.get("id");
-    if (id) {
-      setEvalId(id);
+    const demo = searchParams.get("demo");
+    if (demo) {
+      setEvalMeta({ agentName: "WFP Support Bot", numConversations: 6, numExperts: 3 });
+      setIsDemoMode(true);
       setPhase("evaluating");
     }
   }, []);
@@ -1731,7 +844,7 @@ export default function EvaluatorPage() {
       setEvalMeta({
         agentName: data.agent_name,
         numConversations: data.input_method === "api_probe"
-          ? (data.api_config?.probe_count || 0)
+          ? 0
           : data.conversations.length,
         numExperts: data.experts.filter((e) => e.enabled).length,
       });
@@ -1744,16 +857,18 @@ export default function EvaluatorPage() {
   };
 
   const handleDemoLoad = () => {
-    setEvalMeta({ agentName: "WFP Customer Support Bot v2.1", numConversations: 6, numExperts: 3 });
+    setEvalMeta({ agentName: "WFP Support Bot", numConversations: 6, numExperts: 3 });
     setIsDemoMode(true);
     setPhase("evaluating");
   };
 
   const handleComplete = (resultData) => {
-    setResult(resultData);
-    setPhase("results");
-    // Update URL with eval ID for sharing/bookmarking
-    navigate(`/evaluate?id=${resultData.eval_id}`, { replace: true });
+    // Navigate to the dedicated results page
+    if (isDemoMode) {
+      navigate("/results/demo");
+    } else {
+      navigate(`/results/${resultData.eval_id}`);
+    }
   };
 
   const handleError = (error) => {
@@ -1763,7 +878,6 @@ export default function EvaluatorPage() {
   const handleNewEvaluation = () => {
     setPhase("input");
     setEvalId(null);
-    setResult(null);
     setEvalError(null);
     setSubmitError(null);
     setIsDemoMode(false);
@@ -1830,9 +944,6 @@ export default function EvaluatorPage() {
           />
         )}
 
-        {phase === "results" && result && (
-          <ResultsPhase result={result} onNewEvaluation={handleNewEvaluation} />
-        )}
       </main>
 
       <Footer />

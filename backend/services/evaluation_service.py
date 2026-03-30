@@ -14,6 +14,10 @@ from models.schemas import (
     CouncilResult,
 )
 from orchestrators.simple_orchestrator import SimpleOrchestrator
+from orchestrators.orchestrator_factory import OrchestratorFactory
+from experts.expert import Expert
+from experts.llm_providers import ProviderRegistry
+from dimensions.loader import load_all_dimensions
 
 logger = logging.getLogger(__name__)
 
@@ -279,63 +283,35 @@ class EvaluationService:
 
     def _create_experts(self, eval_input: EvaluationInput) -> list:
         """
-        Instantiate expert objects based on the enabled experts in the input.
-        Returns only experts that have configured API keys.
+        Instantiate expert objects using the ProviderRegistry.
+        Supports any registered provider (claude, gpt4o, gemini, local, etc.).
         """
-        from experts.claude_expert import ClaudeExpert
-        from experts.openai_expert import OpenAIExpert
-        from experts.gemini_expert import GeminiExpert
-
+        registry = ProviderRegistry()
+        dimensions = load_all_dimensions()
         experts = []
+        expert_num = 0
 
         for expert_config in eval_input.experts:
             if not expert_config.enabled:
                 continue
 
             llm = expert_config.llm.lower()
+            expert_num += 1
 
-            # Use custom API key if provided, otherwise fall back to config
-            if llm == "claude":
-                api_key = expert_config.custom_api_key or Config.ANTHROPIC_API_KEY
-                if not api_key:
-                    logger.warning(f"Skipping Claude expert: no API key configured")
-                    continue
-                experts.append(
-                    ClaudeExpert(
-                        name=Config.EXPERT_A_NAME,
-                        api_key=api_key,
-                        model=Config.CLAUDE_MODEL,
-                    )
+            try:
+                provider = registry.create(
+                    provider_key=llm,
+                    api_key=expert_config.custom_api_key or "",
                 )
-
-            elif llm == "gpt4o":
-                api_key = expert_config.custom_api_key or Config.OPENAI_API_KEY
-                if not api_key:
-                    logger.warning(f"Skipping GPT-4o expert: no API key configured")
-                    continue
-                experts.append(
-                    OpenAIExpert(
-                        name=Config.EXPERT_B_NAME,
-                        api_key=api_key,
-                        model=Config.OPENAI_MODEL,
-                    )
-                )
-
-            elif llm == "gemini":
-                api_key = expert_config.custom_api_key or Config.GOOGLE_API_KEY
-                if not api_key:
-                    logger.warning(f"Skipping Gemini expert: no API key configured")
-                    continue
-                experts.append(
-                    GeminiExpert(
-                        name=Config.EXPERT_C_NAME,
-                        api_key=api_key,
-                        model=Config.GEMINI_MODEL,
-                    )
-                )
-
-            else:
-                logger.warning(f"Unknown expert LLM provider: {llm}")
+                expert_name = f"Expert {expert_num} ({provider.model})"
+                experts.append(Expert(
+                    name=expert_name,
+                    provider=provider,
+                    dimensions=dimensions,
+                ))
+                logger.info(f"Created expert: {expert_name} using {llm}")
+            except Exception as e:
+                logger.warning(f"Skipping {llm} expert: {e}")
 
         return experts
 
