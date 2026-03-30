@@ -284,7 +284,8 @@ Return a JSON array of exactly {probe_count} objects. Each object must have: cat
 def load_predefined_probes(yaml_path: str = None) -> list:
     """
     Load predefined test probes from the YAML library.
-    Returns a list of dicts: [{category, label, prompt, maps_to_dimensions}, ...]
+    Organized by dimension — each probe maps to exactly one evaluation dimension.
+    Returns a list of dicts: [{dimension_id, dimension_name, label, prompt}, ...]
     """
     import os
     import yaml
@@ -299,16 +300,16 @@ def load_predefined_probes(yaml_path: str = None) -> list:
         data = yaml.safe_load(f)
 
     probes = []
-    for category in data.get("categories", []):
-        cat_name = category["name"]
-        dims = category.get("maps_to_dimensions", [])
-        for probe in category.get("probes", []):
+    for dim in data.get("dimensions", []):
+        dim_id = dim["dimension_id"]
+        dim_name = dim["dimension_name"]
+        for probe in dim.get("probes", []):
             probes.append({
-                "category": cat_name,
+                "dimension_id": dim_id,
+                "dimension_name": dim_name,
                 "label": probe["label"],
                 "prompt": probe["prompt"],
-                "maps_to_dimensions": dims,
             })
 
-    logger.info(f"Loaded {len(probes)} predefined probes from {yaml_path}")
+    logger.info(f"Loaded {len(probes)} predefined probes across {len(data.get('dimensions', []))} dimensions from {yaml_path}")
     return probes
