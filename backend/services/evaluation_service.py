@@ -236,12 +236,25 @@ class EvaluationService:
                     "No experts could be initialized. Check API key configuration."
                 )
 
-            orchestrator = SimpleOrchestrator(
-                experts=experts,
-                synthesizer_expert=experts[0],
-                eval_id=eval_id,
-                agent_name=eval_input.agent_name,
-            )
+            # Select orchestration method from input (default: deliberative)
+            strategy = getattr(eval_input, "orchestration_method", None) or "deliberative"
+            try:
+                orchestrator = OrchestratorFactory.create(strategy, experts)
+                # Set extra params for deliberative orchestrator
+                if hasattr(orchestrator, "synthesizer_expert"):
+                    orchestrator.synthesizer_expert = experts[0]
+                if hasattr(orchestrator, "eval_id"):
+                    orchestrator.eval_id = eval_id
+                if hasattr(orchestrator, "agent_name"):
+                    orchestrator.agent_name = eval_input.agent_name
+            except ValueError:
+                logger.warning(f"Unknown strategy '{strategy}', falling back to deliberative")
+                orchestrator = SimpleOrchestrator(
+                    experts=experts,
+                    synthesizer_expert=experts[0],
+                    eval_id=eval_id,
+                    agent_name=eval_input.agent_name,
+                )
 
             # Offset orchestrator step indices so they map to the correct job.steps entries
             def on_progress(step_index: int, status: str, message: str, progress_pct: int):

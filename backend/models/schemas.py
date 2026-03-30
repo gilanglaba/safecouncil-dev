@@ -84,6 +84,7 @@ class EvaluationInput:
     custom_documents: List[str] = field(default_factory=list)
     input_method: Optional[str] = None   # "manual" | "api_probe" | "upload"
     api_config: Optional[dict] = None    # {endpoint, api_key, model, probe_count}
+    orchestration_method: Optional[str] = None  # "deliberative" | "aggregate"
 
     def to_dict(self) -> dict:
         return {
@@ -98,6 +99,7 @@ class EvaluationInput:
             "custom_documents": self.custom_documents,
             "input_method": self.input_method,
             "api_config": self.api_config,
+            "orchestration_method": self.orchestration_method,
         }
 
     @classmethod
@@ -116,6 +118,7 @@ class EvaluationInput:
             custom_documents=d.get("custom_documents", []),
             input_method=d.get("input_method"),
             api_config=d.get("api_config"),
+            orchestration_method=d.get("orchestration_method"),
         )
 
 
