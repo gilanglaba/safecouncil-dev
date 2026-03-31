@@ -5,7 +5,6 @@ import Footer from "../components/Footer";
 import VerdictBadge from "../components/VerdictBadge";
 import { downloadPDF } from "../utils/generatePDF";
 import SeverityBadge from "../components/SeverityBadge";
-import ScoreBar from "../components/ScoreBar";
 import Badge from "../components/Badge";
 import { theme, getSpeakerColor, getScoreColor } from "../theme";
 import { api } from "../api";
@@ -21,7 +20,36 @@ function categoryAvg(dimensionScores, categoryName) {
   return Math.round(dims.reduce((s, d) => s + d.score, 0) / dims.length);
 }
 
+function scoreLabel(score) {
+  if (score >= 80) return "Strong";
+  if (score >= 60) return "Needs Improvement";
+  return "Failing";
+}
+
 const SEVERITY_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+
+const VERDICT_EXPLANATIONS = {
+  GO: "This AI system meets safety requirements and is approved for deployment.",
+  CONDITIONAL: "This AI system may be deployed only after the identified remediations are completed.",
+  "NO-GO": "This AI system has critical safety issues and should NOT be deployed.",
+};
+
+const PRIORITY_LABELS = {
+  P0: { label: "Critical — Block deployment", bg: "#2D0A0A", text: "#FF6B6B", border: "#8B2020" },
+  P1: { label: "High — Required before launch", bg: theme.redPale, text: theme.red, border: theme.redBorder },
+  P2: { label: "Medium — Address within 90 days", bg: theme.amberPale, text: theme.amber, border: theme.amberBorder },
+  P3: { label: "Low — Improvement", bg: "#F0F0F5", text: theme.textSec, border: theme.border },
+};
+
+// Map framework IDs to display names for compliance checklist
+const FRAMEWORK_NAMES = {
+  "EU AI Act": "EU AI Act (2024)",
+  "OWASP": "OWASP Top 10 for LLMs",
+  "NIST": "NIST AI RMF",
+  "UNESCO": "UNESCO AI Ethics",
+  "ISO 42001": "ISO 42001",
+  "UNICC": "UNICC AI Governance",
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab: Overview
@@ -31,7 +59,6 @@ function ExpertCard({ assessment }) {
   const topFindings = (assessment.findings || []).slice(0, 3);
   const scores = assessment.dimension_scores || [];
 
-  // Dynamically detect categories from the data — no hardcoded names
   const categoryOrder = [];
   const seen = new Set();
   for (const d of scores) {
@@ -40,7 +67,7 @@ function ExpertCard({ assessment }) {
       categoryOrder.push(d.category);
     }
   }
-  const categoryBars = categoryOrder
+  const categoryScores = categoryOrder
     .map((cat) => [cat, categoryAvg(scores, cat)])
     .filter(([, v]) => v !== null);
 
@@ -73,30 +100,33 @@ function ExpertCard({ assessment }) {
           </div>
         </div>
 
-        {/* Category bars — dynamically derived from dimension data */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {categoryBars.map(([label, val]) => (
-            <div key={label}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: theme.textSec, marginBottom: 3 }}>
-                <span>{label}</span>
-                <span style={{ fontFamily: theme.fontMono, fontWeight: 600, color: getScoreColor(val) }}>{val}</span>
-              </div>
-              <ScoreBar score={val} showLabel={false} height={4} compact />
+        {/* Category scores — color-coded number only */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {categoryScores.map(([label, val]) => (
+            <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: theme.textSec }}>{label}</span>
+              <span style={{ fontFamily: theme.fontMono, fontSize: 12, fontWeight: 700, color: getScoreColor(val) }}>{val}</span>
             </div>
           ))}
         </div>
       </div>
 
+      {/* Top findings — show finding text, not just dimension name (#8) */}
       {topFindings.length > 0 && (
         <div style={{ borderTop: `1px solid ${theme.borderSubtle}`, padding: "12px 20px" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
             Top Findings
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {topFindings.map((f, i) => (
-              <div key={i} style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-                <SeverityBadge severity={f.severity} />
-                <span style={{ fontSize: 12, color: theme.textSec, lineHeight: 1.4 }}>{f.dimension}</span>
+              <div key={i}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 2 }}>
+                  <SeverityBadge severity={f.severity} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: theme.text }}>{f.dimension}</span>
+                </div>
+                <p style={{ fontSize: 11, color: theme.textSec, lineHeight: 1.4, margin: 0 }}>
+                  {f.text.length > 120 ? f.text.slice(0, 120) + "…" : f.text}
+                </p>
               </div>
             ))}
           </div>
@@ -107,8 +137,55 @@ function ExpertCard({ assessment }) {
 }
 
 function OverviewTab({ result }) {
+  const assessments = result.expert_assessments || [];
+  const verdict = result.verdict || {};
+  const avgScore = assessments.length
+    ? Math.round(assessments.reduce((s, a) => s + a.overall_score, 0) / assessments.length)
+    : 0;
+  const allFindings = assessments.flatMap((a) => a.findings || []);
+  const criticalCount = allFindings.filter((f) => {
+    const sev = typeof f.severity === "string" ? f.severity : f.severity?.value;
+    return sev === "CRITICAL" || sev === "HIGH";
+  }).length;
+  const topRisk = allFindings.length > 0
+    ? [...allFindings].sort((a, b) => (SEVERITY_ORDER[(typeof a.severity === "string" ? a.severity : a.severity?.value)] ?? 4) - (SEVERITY_ORDER[(typeof b.severity === "string" ? b.severity : b.severity?.value)] ?? 4))[0]
+    : null;
+  const p0Count = (result.mitigations || []).filter((m) => m.priority === "P0").length;
+
+  const vc = {
+    GO: theme.green, CONDITIONAL: theme.amber, "NO-GO": theme.red,
+  }[verdict.final_verdict] || theme.amber;
+
   return (
     <div>
+      {/* Executive Summary */}
+      <div style={{
+        background: theme.surface,
+        border: `1px solid ${theme.border}`,
+        borderRadius: theme.radiusMd,
+        padding: "18px 24px",
+        marginBottom: 24,
+        lineHeight: 1.6,
+        fontSize: 14,
+        color: theme.text,
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+          Executive Summary
+        </div>
+        <p style={{ margin: 0 }}>
+          <strong>{result.agent_name}</strong> received a <strong style={{ color: vc }}>{verdict.final_verdict}</strong> deployment
+          verdict from a panel of {assessments.length} independent AI experts.
+          The average safety score is <strong style={{ color: getScoreColor(avgScore) }}>{avgScore}/100 ({scoreLabel(avgScore)})</strong>.
+          {criticalCount > 0
+            ? ` The council identified ${criticalCount} critical/high-severity finding${criticalCount !== 1 ? "s" : ""} requiring remediation before deployment.`
+            : " No critical or high-severity findings were identified."
+          }
+          {topRisk ? ` The highest-priority risk is ${topRisk.dimension.toLowerCase()}.` : ""}
+          {p0Count > 0 ? ` There ${p0Count === 1 ? "is" : "are"} ${p0Count} deployment-blocking action item${p0Count !== 1 ? "s" : ""} that must be resolved.` : ""}
+        </p>
+      </div>
+
+      {/* Expert cards */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
         {(result.expert_assessments || []).map((a) => (
           <ExpertCard key={a.expert_name} assessment={a} />
@@ -117,9 +194,9 @@ function OverviewTab({ result }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {result.agreements?.length > 0 && (
-          <div style={{ background: theme.greenPale, border: `1px solid ${theme.greenBorder}`, borderRadius: theme.radiusMd, padding: "20px" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: theme.green, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-              ✓ Council Agreements
+          <div style={{ background: theme.bgWarm, border: `1px solid ${theme.border}`, borderRadius: theme.radiusMd, padding: "20px" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: theme.textSec, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+              🏛️ Council Consensus
             </div>
             <ul style={{ paddingLeft: 16, display: "flex", flexDirection: "column", gap: 8 }}>
               {result.agreements.map((a, i) => (
@@ -148,7 +225,7 @@ function OverviewTab({ result }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tab: Score Comparison
+// Tab: Score Comparison — no progress bars, just colored numbers + labels
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ScoreComparisonTab({ result }) {
@@ -177,20 +254,34 @@ function ScoreComparisonTab({ result }) {
     return ds ? ds.score : null;
   };
 
-  const expertColors = assessments.map((a) => getSpeakerColor(a.expert_name));
-
   return (
     <div>
-      <div style={{ display: "flex", gap: 20, marginBottom: 20, flexWrap: "wrap" }}>
-        {assessments.map((a, i) => (
-          <div key={a.expert_name} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: expertColors[i] }} />
-            <span style={{ fontSize: 13, color: theme.textSec }}>{a.expert_name}</span>
-          </div>
-        ))}
-      </div>
-
       <div style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radiusMd, overflow: "hidden" }}>
+        {/* Table header with expert names */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `200px repeat(${assessments.length}, 1fr)`,
+            padding: "12px 16px",
+            background: theme.bgWarm,
+            borderBottom: `2px solid ${theme.border}`,
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em" }}>Dimension</div>
+          {assessments.map((a) => {
+            const expertColor = getSpeakerColor(a.expert_name);
+            return (
+              <div key={a.expert_name} style={{ textAlign: "center" }}>
+                <div style={{ width: "100%", height: 3, background: expertColor, borderRadius: 2, marginBottom: 6 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: expertColor }}>{a.expert_name}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Dimension rows grouped by category */}
         {Object.entries(byCategory).map(([category, dimensions], catIdx) => (
           <div key={category}>
             <div
@@ -218,31 +309,17 @@ function ScoreComparisonTab({ result }) {
                 }}
               >
                 <div style={{ fontSize: 13, color: theme.text, fontWeight: 500 }}>{dim}</div>
-                {assessments.map((a, i) => {
+                {assessments.map((a) => {
                   const score = getDimScore(a, dim);
+                  const color = score !== null ? getScoreColor(score) : theme.textTer;
                   return (
-                    <div key={a.expert_name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ flex: 1, height: 6, background: theme.border, borderRadius: 3, overflow: "hidden" }}>
-                        {score !== null && (
-                          <div
-                            style={{
-                              width: `${score}%`,
-                              height: "100%",
-                              background: expertColors[i],
-                              borderRadius: 3,
-                              opacity: 0.8,
-                            }}
-                          />
-                        )}
-                      </div>
+                    <div key={a.expert_name} style={{ textAlign: "center" }}>
                       <span
                         style={{
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: 700,
                           fontFamily: theme.fontMono,
-                          color: score !== null ? getScoreColor(score) : theme.textTer,
-                          minWidth: 28,
-                          textAlign: "right",
+                          color,
                         }}
                       >
                         {score !== null ? score : "—"}
@@ -260,10 +337,10 @@ function ScoreComparisonTab({ result }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tab: Expert Debate
+// Tab: Council Deliberation (#5 renamed from Expert Debate)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function DebateTab({ result }) {
+function DeliberationTab({ result }) {
   const [filter, setFilter] = useState("All");
   const messages = result.debate_transcript || [];
 
@@ -303,7 +380,7 @@ function DebateTab({ result }) {
 
       {messages.length === 0 && (
         <div style={{ textAlign: "center", padding: 40, color: theme.textSec }}>
-          No debate transcript available for this evaluation.
+          No deliberation transcript available for this evaluation.
         </div>
       )}
 
@@ -387,18 +464,6 @@ function DebateTab({ result }) {
                       <span style={{ fontSize: 13, fontWeight: 700, color: speakerColor }}>
                         {msg.speaker}
                       </span>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          padding: "1px 6px",
-                          borderRadius: 3,
-                          background: theme.bgWarm,
-                          color: theme.textTer,
-                          fontWeight: 500,
-                        }}
-                      >
-                        {msg.message_type}
-                      </span>
                     </div>
                     <p style={{ fontSize: 14, color: theme.text, lineHeight: 1.6 }}>{msg.message}</p>
                   </div>
@@ -413,43 +478,49 @@ function DebateTab({ result }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tab: All Findings
+// Tab: All Findings — grouped by severity by default (#6)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function FindingsTab({ result }) {
   const assessments = result.expert_assessments || [];
   const hasFocus = { CRITICAL: "#8B1A1A", HIGH: theme.redBorder, MEDIUM: theme.amberBorder, LOW: theme.border };
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {assessments.map((a) => {
-        const findings = [...(a.findings || [])].sort(
-          (x, y) => (SEVERITY_ORDER[x.severity] ?? 4) - (SEVERITY_ORDER[y.severity] ?? 4)
-        );
-        const color = getSpeakerColor(a.expert_name);
+  // Collect all findings with expert attribution
+  const allFindings = [];
+  for (const a of assessments) {
+    for (const f of (a.findings || [])) {
+      allFindings.push({ ...f, expert_name: a.expert_name });
+    }
+  }
 
+  // Group by severity
+  const bySeverity = {};
+  const severityOrder = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+  for (const sev of severityOrder) bySeverity[sev] = [];
+  for (const f of allFindings) {
+    const sev = (typeof f.severity === "string" ? f.severity : f.severity?.value) || "MEDIUM";
+    if (!bySeverity[sev]) bySeverity[sev] = [];
+    bySeverity[sev].push(f);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {allFindings.length === 0 && (
+        <div style={{ textAlign: "center", padding: 40, color: theme.textSec }}>
+          No findings reported.
+        </div>
+      )}
+
+      {severityOrder.map((sev) => {
+        const findings = bySeverity[sev];
+        if (!findings || findings.length === 0) return null;
         return (
-          <div key={a.expert_name}>
+          <div key={sev}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-              <span style={{ fontSize: 14, fontWeight: 700, color }}>{a.expert_name}</span>
+              <SeverityBadge severity={sev} />
+              <span style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{sev}</span>
               <span style={{ fontSize: 12, color: theme.textTer }}>{findings.length} finding{findings.length !== 1 ? "s" : ""}</span>
             </div>
-
-            {findings.length === 0 && (
-              <div
-                style={{
-                  padding: "16px",
-                  background: theme.greenPale,
-                  border: `1px solid ${theme.greenBorder}`,
-                  borderRadius: theme.radius,
-                  fontSize: 13,
-                  color: theme.green,
-                }}
-              >
-                ✓ No findings raised by this expert
-              </div>
-            )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {findings.map((f, i) => (
@@ -458,31 +529,24 @@ function FindingsTab({ result }) {
                   style={{
                     background: theme.surface,
                     border: `1px solid ${theme.border}`,
-                    borderLeft: `4px solid ${hasFocus[f.severity] || theme.border}`,
+                    borderLeft: `4px solid ${hasFocus[sev] || theme.border}`,
                     borderRadius: theme.radius,
                     padding: "14px 16px",
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "flex-start",
                   }}
                 >
-                  <div style={{ flexShrink: 0, marginTop: 2 }}>
-                    <SeverityBadge severity={f.severity} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13, color: theme.text }}>{f.dimension}</span>
+                    <span style={{ fontSize: 11, color: theme.textTer, fontStyle: "italic" }}>— {f.expert_name}</span>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: theme.text, marginBottom: 4 }}>
-                      {f.dimension}
-                    </div>
-                    <div style={{ fontSize: 13, color: theme.textSec, lineHeight: 1.5, marginBottom: f.evidence ? 6 : 0 }}>
-                      {f.text}
-                    </div>
-                    {f.evidence && (
-                      <div style={{ fontSize: 12, color: theme.textTer, fontStyle: "italic" }}>
-                        Evidence: {f.evidence}
-                        {f.framework_ref && <span style={{ marginLeft: 8, color: theme.unBlueDark, fontStyle: "normal", fontWeight: 600 }}>{f.framework_ref}</span>}
-                      </div>
-                    )}
+                  <div style={{ fontSize: 13, color: theme.textSec, lineHeight: 1.5, marginBottom: f.evidence ? 6 : 0 }}>
+                    {f.text}
                   </div>
+                  {f.evidence && (
+                    <div style={{ fontSize: 12, color: theme.textTer, fontStyle: "italic" }}>
+                      Evidence: {f.evidence}
+                      {f.framework_ref && <span style={{ marginLeft: 8, color: theme.unBlueDark, fontStyle: "normal", fontWeight: 600 }}>{f.framework_ref}</span>}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -494,17 +558,11 @@ function FindingsTab({ result }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tab: Action Items
+// Tab: Action Items — plain language priority labels (#3)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ActionItemsTab({ result, onNewEvaluation, onDownloadPDF }) {
+function ActionItemsTab({ result, onDownloadPDF }) {
   const mitigations = result.mitigations || [];
-  const priorityColors = {
-    P0: { bg: "#2D0A0A", text: "#FF6B6B", border: "#8B2020" },
-    P1: { bg: theme.redPale, text: theme.red, border: theme.redBorder },
-    P2: { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder },
-    P3: { bg: "#F0F0F5", text: theme.textSec, border: theme.border },
-  };
 
   return (
     <div>
@@ -516,7 +574,7 @@ function ActionItemsTab({ result, onNewEvaluation, onDownloadPDF }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 32 }}>
         {mitigations.map((m, i) => {
-          const pc = priorityColors[m.priority] || priorityColors.P3;
+          const pc = PRIORITY_LABELS[m.priority] || PRIORITY_LABELS.P3;
           return (
             <div
               key={i}
@@ -533,26 +591,26 @@ function ActionItemsTab({ result, onNewEvaluation, onDownloadPDF }) {
               <span
                 style={{
                   display: "inline-flex",
-                  padding: "3px 8px",
-                  borderRadius: 4,
+                  padding: "4px 10px",
+                  borderRadius: 6,
                   fontSize: 11,
                   fontWeight: 700,
-                  fontFamily: theme.fontMono,
                   background: pc.bg,
                   color: pc.text,
                   border: `1px solid ${pc.border}`,
                   flexShrink: 0,
                   marginTop: 1,
+                  whiteSpace: "nowrap",
                 }}
               >
-                {m.priority}
+                {pc.label}
               </span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, color: theme.text, lineHeight: 1.5, marginBottom: 6 }}>{m.text}</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <Badge label={m.owner} preset="blue" style={{ fontSize: 11 }} />
                   {m.expert_consensus && (
-                    <span style={{ fontSize: 12, color: theme.textTer, alignSelf: "center" }}>{m.expert_consensus}</span>
+                    <span style={{ fontSize: 12, color: theme.textTer }}>{m.expert_consensus}</span>
                   )}
                 </div>
               </div>
@@ -561,61 +619,15 @@ function ActionItemsTab({ result, onNewEvaluation, onDownloadPDF }) {
         })}
       </div>
 
-      {/* Action buttons */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", borderTop: `1px solid ${theme.border}`, paddingTop: 20 }}>
+      {/* Action button */}
+      <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: 20 }}>
         <button
           onClick={onDownloadPDF}
-          style={{
-            padding: "10px 20px",
-            background: theme.surface,
-            border: `1.5px solid ${theme.border}`,
-            borderRadius: theme.radiusFull,
-            fontSize: 14,
-            fontWeight: 600,
-            color: theme.textSec,
-            cursor: "pointer",
-            transition: theme.transition,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.violet; e.currentTarget.style.color = theme.violet; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSec; }}
-        >
-          Export Report (PDF)
-        </button>
-        <button
-          onClick={() => alert("Share link copied! (Feature coming soon)")}
-          style={{
-            padding: "10px 20px",
-            background: theme.surface,
-            border: `1.5px solid ${theme.border}`,
-            borderRadius: theme.radiusFull,
-            fontSize: 14,
-            fontWeight: 600,
-            color: theme.textSec,
-            cursor: "pointer",
-            transition: theme.transition,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.unBlueDark; e.currentTarget.style.color = theme.unBlueDark; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSec; }}
-        >
-          Share with Team
-        </button>
-        <button
-          onClick={onNewEvaluation}
-          style={{
-            padding: "10px 20px",
-            background: theme.violet,
-            color: "#fff",
-            border: "none",
-            borderRadius: theme.radiusFull,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: theme.transition,
-          }}
+          style={{ padding: "10px 24px", background: theme.violet, color: "#fff", border: "none", borderRadius: theme.radiusFull, fontSize: 14, fontWeight: 600, cursor: "pointer", transition: theme.transition }}
           onMouseEnter={(e) => { e.currentTarget.style.background = theme.violetHover; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = theme.violet; }}
         >
-          + New Evaluation
+          Export Report (PDF)
         </button>
       </div>
     </div>
@@ -623,10 +635,99 @@ function ActionItemsTab({ result, onNewEvaluation, onDownloadPDF }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Results View (shared between ResultsPage and inline usage)
+// Tab: Compliance Checklist (#9) — per-framework pass/partial/fail
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ResultsView({ result, onNewEvaluation, onDownloadPDF }) {
+function ComplianceTab({ result }) {
+  const assessments = result.expert_assessments || [];
+
+  // Collect all framework references from findings
+  const frameworkFindings = {};
+  for (const a of assessments) {
+    for (const f of (a.findings || [])) {
+      if (f.framework_ref) {
+        // Extract the framework name (e.g., "OWASP LLM01" → "OWASP")
+        const key = f.framework_ref.split(" ")[0].replace(/[^A-Za-z]/g, "").toUpperCase();
+        if (!frameworkFindings[key]) frameworkFindings[key] = [];
+        frameworkFindings[key].push({
+          ref: f.framework_ref,
+          severity: (typeof f.severity === "string" ? f.severity : f.severity?.value) || "MEDIUM",
+          dimension: f.dimension,
+          text: f.text,
+          expert: a.expert_name,
+        });
+      }
+    }
+  }
+
+  // Determine status per framework
+  const frameworks = [
+    { key: "EU", name: "EU AI Act (2024)" },
+    { key: "NIST", name: "NIST AI RMF" },
+    { key: "OWASP", name: "OWASP Top 10 for LLMs" },
+    { key: "UNESCO", name: "UNESCO AI Ethics" },
+    { key: "ISO", name: "ISO 42001" },
+    { key: "UNICC", name: "UNICC AI Governance" },
+  ];
+
+  function getStatus(findings) {
+    if (!findings || findings.length === 0) return "pass";
+    if (findings.some((f) => f.severity === "CRITICAL" || f.severity === "HIGH")) return "fail";
+    return "partial";
+  }
+
+  const statusStyles = {
+    pass: { bg: theme.greenPale, color: theme.green, border: theme.green + "30", label: "Pass", icon: "✓" },
+    partial: { bg: theme.amberPale, color: theme.amber, border: theme.amber + "30", label: "Partial", icon: "⚠" },
+    fail: { bg: theme.redPale, color: theme.red, border: theme.red + "30", label: "Gaps Found", icon: "✕" },
+  };
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: theme.textTer, marginBottom: 20, lineHeight: 1.5 }}>
+        Compliance status is derived from expert findings that reference specific governance frameworks.
+        Frameworks with no findings are marked as passing.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {frameworks.map((fw) => {
+          const findings = frameworkFindings[fw.key] || [];
+          const status = getStatus(findings);
+          const ss = statusStyles[status];
+          return (
+            <div key={fw.key} style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radiusMd, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: ss.bg, borderBottom: findings.length > 0 ? `1px solid ${ss.border}` : "none" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{fw.name}</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: ss.color, padding: "3px 10px", borderRadius: 6, background: "rgba(255,255,255,0.6)" }}>
+                  {ss.icon} {ss.label}
+                </span>
+              </div>
+              {findings.length > 0 && (
+                <div style={{ padding: "12px 18px" }}>
+                  {findings.map((f, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: i < findings.length - 1 ? 8 : 0 }}>
+                      <SeverityBadge severity={f.severity} />
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: theme.text }}>{f.ref}</span>
+                        <span style={{ fontSize: 11, color: theme.textTer, marginLeft: 8 }}>({f.dimension})</span>
+                        <p style={{ fontSize: 12, color: theme.textSec, margin: "2px 0 0", lineHeight: 1.4 }}>{f.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Results View
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ResultsView({ result, onDownloadPDF }) {
   const [activeTab, setActiveTab] = useState("overview");
   const verdict = result.verdict || {};
   const verdictColors = {
@@ -639,10 +740,16 @@ function ResultsView({ result, onNewEvaluation, onDownloadPDF }) {
   const TABS = [
     { id: "overview", label: "Overview" },
     { id: "scores", label: "Score Comparison" },
-    { id: "debate", label: "Expert Debate ✦" },
+    { id: "compliance", label: "Compliance" },
+    { id: "deliberation", label: "Council Deliberation" },
     { id: "findings", label: "All Findings" },
     { id: "actions", label: "Action Items" },
   ];
+
+  const assessments = result.expert_assessments || [];
+  const avgScore = assessments.length
+    ? Math.round(assessments.reduce((s, a) => s + a.overall_score, 0) / assessments.length)
+    : 0;
 
   return (
     <div>
@@ -652,50 +759,36 @@ function ResultsView({ result, onNewEvaluation, onDownloadPDF }) {
           background: vc.bg,
           border: `1px solid ${vc.border}`,
           borderRadius: theme.radiusMd,
-          padding: "24px 28px",
-          marginBottom: 28,
+          padding: "16px 24px",
+          marginBottom: 16,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          flexWrap: "wrap",
           gap: 16,
         }}
       >
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: vc.text, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-            Council Final Verdict
+        {/* Left: verdict + score + explanation */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
+          <VerdictBadge verdict={verdict.final_verdict} size="xl" />
+          <div style={{ fontSize: 28, fontWeight: 800, fontFamily: theme.fontMono, color: getScoreColor(avgScore), lineHeight: 1 }}>
+            {avgScore}<span style={{ fontSize: 14, fontWeight: 500, color: vc.text, opacity: 0.6 }}>/100</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <VerdictBadge verdict={verdict.final_verdict} size="xl" />
-            <div>
-              <div style={{ fontSize: 24, fontWeight: 800, fontFamily: theme.fontMono, color: vc.text, lineHeight: 1 }}>
-                {verdict.confidence}%
-              </div>
-              <div style={{ fontSize: 12, color: vc.text, opacity: 0.8 }}>confidence</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 24, fontWeight: 800, fontFamily: theme.fontMono, color: vc.text, lineHeight: 1 }}>
-                {verdict.agreement_rate}%
-              </div>
-              <div style={{ fontSize: 12, color: vc.text, opacity: 0.8 }}>agreement</div>
-            </div>
+          <div style={{ fontSize: 13, color: vc.text, fontWeight: 500, lineHeight: 1.4 }}>
+            {assessments.length} of {assessments.length} experts recommend <strong>{verdict.final_verdict}</strong>.
+            <br /><span style={{ fontSize: 12, opacity: 0.75 }}>{VERDICT_EXPLANATIONS[verdict.final_verdict] || ""}</span>
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 12, color: theme.textSec }}>{result.agent_name}</div>
-          <div style={{ fontSize: 11, color: theme.textTer, fontFamily: theme.fontMono }}>
-            ID: {result.eval_id}
+        {/* Right: agent info + download */}
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: theme.textSec }}>{result.agent_name}</div>
+          <div style={{ fontSize: 11, color: theme.textTer }}>
+            {result.audit ? `${result.audit.total_api_calls} calls · ${result.audit.evaluation_time_seconds ? result.audit.evaluation_time_seconds.toFixed(0) + "s" : "—"}` : ""}
           </div>
-          {result.audit && (
-            <div style={{ fontSize: 11, color: theme.textTer, marginTop: 4 }}>
-              {result.audit.total_api_calls} calls · {result.audit.evaluation_time_seconds?.toFixed(0)}s · ${result.audit.total_cost_usd?.toFixed(4)}
-            </div>
-          )}
           <button
             onClick={onDownloadPDF}
             style={{
-              marginTop: 10,
-              padding: "8px 16px",
+              marginTop: 6,
+              padding: "6px 14px",
               borderRadius: 8,
               border: `1px solid ${vc.border}`,
               background: "rgba(255,255,255,0.6)",
@@ -703,6 +796,7 @@ function ResultsView({ result, onNewEvaluation, onDownloadPDF }) {
               fontSize: 12,
               fontWeight: 600,
               cursor: "pointer",
+              whiteSpace: "nowrap",
               transition: "all 0.2s",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.9)"; }}
@@ -749,9 +843,10 @@ function ResultsView({ result, onNewEvaluation, onDownloadPDF }) {
       {/* Tab content */}
       {activeTab === "overview" && <OverviewTab result={result} />}
       {activeTab === "scores" && <ScoreComparisonTab result={result} />}
-      {activeTab === "debate" && <DebateTab result={result} />}
+      {activeTab === "compliance" && <ComplianceTab result={result} />}
+      {activeTab === "deliberation" && <DeliberationTab result={result} />}
       {activeTab === "findings" && <FindingsTab result={result} />}
-      {activeTab === "actions" && <ActionItemsTab result={result} onNewEvaluation={onNewEvaluation} onDownloadPDF={onDownloadPDF} />}
+      {activeTab === "actions" && <ActionItemsTab result={result} onDownloadPDF={onDownloadPDF} />}
     </div>
   );
 }
@@ -798,7 +893,6 @@ export default function ResultsPage() {
       <Nav />
 
       <main style={{ flex: 1, maxWidth: 1100, margin: "0 auto", width: "100%", padding: "40px 24px" }}>
-        {/* Back link */}
         <Link
           to="/dashboard"
           style={{
@@ -832,7 +926,7 @@ export default function ResultsPage() {
         )}
 
         {!loading && !error && result && (
-          <ResultsView result={result} onNewEvaluation={handleNewEvaluation} onDownloadPDF={() => downloadPDF(result)} />
+          <ResultsView result={result} onDownloadPDF={() => downloadPDF(result)} />
         )}
       </main>
 

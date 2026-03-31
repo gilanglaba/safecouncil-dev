@@ -181,9 +181,8 @@ export const DEMO_RESULT = {
   ],
 
   audit: {
-    total_api_calls: 0,
-    total_tokens_used: 0,
-    total_cost_usd: 0,
-    evaluation_time_seconds: 0,
+    total_api_calls: 42,
+    total_tokens_used: 86400,
+    evaluation_time_seconds: 187,
   },
 };
