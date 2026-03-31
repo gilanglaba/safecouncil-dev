@@ -82,10 +82,25 @@ class BaseExpert(ABC):
         self.total_output_tokens += output_tokens
 
     @staticmethod
+    def _clean_json_string(text: str) -> str:
+        """Clean common JSON issues from LLM output."""
+        # Remove trailing commas before } or ]
+        text = re.sub(r',\s*([}\]])', r'\1', text)
+        # Remove comments (// style)
+        text = re.sub(r'//[^\n]*', '', text)
+        # Fix unescaped newlines inside strings (common LLM issue)
+        # Replace literal newlines within JSON string values
+        text = text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+        # But don't escape newlines between JSON fields — restore structural newlines
+        text = re.sub(r'\\n(\s*["\}\]\{,])', lambda m: '\n' + m.group(1), text)
+        return text
+
+    @staticmethod
     def extract_json(text: str) -> dict:
         """
         Robustly extract JSON from LLM response.
-        Handles: clean JSON, markdown code blocks, JSON with surrounding text.
+        Handles: clean JSON, markdown code blocks, JSON with surrounding text,
+        trailing commas, comments, and other common LLM JSON issues.
         """
         if not text or not text.strip():
             raise ValueError("Empty response from LLM")
@@ -104,7 +119,11 @@ class BaseExpert(ABC):
             try:
                 return json.loads(match.group(1))
             except json.JSONDecodeError:
-                pass
+                # Try with cleanup
+                try:
+                    return json.loads(BaseExpert._clean_json_string(match.group(1)))
+                except json.JSONDecodeError:
+                    pass
 
         # Try 3: find ``` ... ``` block (any code block)
         match = re.search(r"```\s*(.*?)\s*```", stripped, re.DOTALL)
@@ -112,10 +131,12 @@ class BaseExpert(ABC):
             try:
                 return json.loads(match.group(1))
             except json.JSONDecodeError:
-                pass
+                try:
+                    return json.loads(BaseExpert._clean_json_string(match.group(1)))
+                except json.JSONDecodeError:
+                    pass
 
         # Try 4: find the first complete { ... } block (handles preamble text)
-        # Use a regex that matches balanced braces
         brace_depth = 0
         start_idx = None
         for i, ch in enumerate(stripped):
@@ -130,8 +151,33 @@ class BaseExpert(ABC):
                     try:
                         return json.loads(json_candidate)
                     except json.JSONDecodeError:
-                        # Reset and keep looking
-                        start_idx = None
+                        # Try with cleanup
+                        try:
+                            return json.loads(BaseExpert._clean_json_string(json_candidate))
+                        except json.JSONDecodeError:
+                            start_idx = None
+
+        # Try 5: last resort — find the LARGEST { ... } block
+        all_candidates = []
+        brace_depth = 0
+        start_idx = None
+        for i, ch in enumerate(stripped):
+            if ch == "{":
+                if brace_depth == 0:
+                    start_idx = i
+                brace_depth += 1
+            elif ch == "}":
+                brace_depth -= 1
+                if brace_depth == 0 and start_idx is not None:
+                    all_candidates.append(stripped[start_idx : i + 1])
+                    start_idx = None
+
+        # Try candidates from largest to smallest
+        for candidate in sorted(all_candidates, key=len, reverse=True):
+            try:
+                return json.loads(BaseExpert._clean_json_string(candidate))
+            except json.JSONDecodeError:
+                continue
 
         raise ValueError(
             f"Could not extract valid JSON from response. "

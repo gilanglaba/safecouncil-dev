@@ -30,7 +30,7 @@ class LLMProvider(ABC):
         self.total_output_tokens = 0
 
     @abstractmethod
-    def call(self, system_prompt: str, user_message: str, max_tokens: int = 4096) -> LLMResponse:
+    def call(self, system_prompt: str, user_message: str, max_tokens: int = 8192) -> LLMResponse:
         """
         Send a system prompt + user message to the LLM and return the response.
         All providers must implement this single method.

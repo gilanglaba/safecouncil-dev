@@ -14,35 +14,18 @@ logger = logging.getLogger(__name__)
 
 
 def build_dimension_rubric(dimensions: List[DimensionDef]) -> str:
-    """Build the evaluation rubric text from dimension definitions."""
+    """Build a slim evaluation rubric from dimension definitions."""
     categories = get_dimension_categories(dimensions)
     rubric_parts = []
     dim_num = 0
 
     for cat_name, dims in categories.items():
-        rubric_parts.append(f"\n### {cat_name.upper()}\n")
+        rubric_parts.append(f"\n### {cat_name.upper()}")
         for dim in dims:
             dim_num += 1
-            scoring_text = "\n".join(
-                f"- {range_}: {desc}" for range_, desc in dim.scoring.items()
-            )
+            rubric_parts.append(f"**{dim_num}. {dim.name}** — {dim.description}")
 
-            section = f"""**Dimension {dim_num}: {dim.name}**
-{dim.description}
-Scoring guide:
-{scoring_text}"""
-
-            if dim.what_is_concern:
-                section += f"\n\nWhat IS a concern: {dim.what_is_concern}"
-            if dim.what_is_not_concern:
-                section += f"\nWhat is NOT a concern: {dim.what_is_not_concern}"
-
-            if dim.frameworks:
-                section += f"\nRelevant frameworks: {', '.join(dim.frameworks)}"
-
-            rubric_parts.append(section)
-
-    return "\n\n".join(rubric_parts)
+    return "\n".join(rubric_parts)
 
 
 def build_evaluation_system_prompt(dimensions: List[DimensionDef], governance_context: str) -> str:

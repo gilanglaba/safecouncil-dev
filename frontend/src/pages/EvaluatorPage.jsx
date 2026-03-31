@@ -64,11 +64,25 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
   const [uploadFileName, setUploadFileName] = useState("");
   const [uploadError, setUploadError] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const PROVIDER_OPTIONS = [
+    { llm: "claude", model: "Claude Sonnet", company: "Anthropic", letter: "A", color: "#D97757" },
+    { llm: "gpt4o", model: "GPT-4o", company: "OpenAI", letter: "⬡", color: "#10A37F" },
+    { llm: "gemini", model: "Gemini Pro", company: "Google", letter: "G", color: "#4285F4" },
+    { llm: "local", model: "Local LLM", company: "LM Studio", letter: "L", color: "#8B5CF6" },
+  ];
   const [experts, setExperts] = useState([
     { id: 1, llm: "claude", name: "Expert 1", model: "Claude Sonnet", company: "Anthropic", letter: "A", color: "#D97757", enabled: true },
     { id: 2, llm: "gpt4o", name: "Expert 2", model: "GPT-4o", company: "OpenAI", letter: "⬡", color: "#10A37F", enabled: true },
     { id: 3, llm: "gemini", name: "Expert 3", model: "Gemini Pro", company: "Google", letter: "G", color: "#4285F4", enabled: true },
   ]);
+
+  const switchProvider = (id, newLlm) => {
+    const opt = PROVIDER_OPTIONS.find((p) => p.llm === newLlm);
+    if (!opt) return;
+    setExperts((e) => e.map((ex) =>
+      ex.id === id ? { ...ex, llm: opt.llm, model: opt.model, company: opt.company, letter: opt.letter, color: opt.color } : ex
+    ));
+  };
   const [showAddExpert, setShowAddExpert] = useState(false);
   const [frameworks, setFrameworks] = useState([
     { id: "eu_ai_act", label: "EU AI Act (2024)", desc: "Risk classification, transparency, high-risk system requirements", checked: true },
@@ -436,16 +450,33 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
                 transition: "all 0.3s",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <CompanyIcon letter={ex.letter} color={ex.enabled ? ex.color : theme.textTer} />
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: theme.textTer, textTransform: "uppercase", letterSpacing: 0.5 }}>{ex.name}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{ex.model}</div>
-                  </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <CompanyIcon letter={ex.letter} color={ex.enabled ? ex.color : theme.textTer} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: theme.textTer, textTransform: "uppercase", letterSpacing: 0.5 }}>{ex.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{ex.model}</div>
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: ex.color, fontWeight: 500 }}>{ex.company}</div>
+              <select
+                value={ex.llm}
+                onChange={(e) => switchProvider(ex.id, e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "6px 8px",
+                  fontSize: 12,
+                  borderRadius: 6,
+                  border: `1px solid ${ex.color + "44"}`,
+                  background: theme.surface,
+                  color: ex.color,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  outline: "none",
+                }}
+              >
+                {PROVIDER_OPTIONS.map((opt) => (
+                  <option key={opt.llm} value={opt.llm}>{opt.model} ({opt.company})</option>
+                ))}
+              </select>
             </div>
           ))}
         </div>

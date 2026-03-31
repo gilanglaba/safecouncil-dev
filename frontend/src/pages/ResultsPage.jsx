@@ -1170,19 +1170,35 @@ export default function ResultsPage() {
       return;
     }
 
-    api.getResult(id)
-      .then(({ status, data }) => {
-        if (status === 200) {
-          setResult(data);
-        } else {
-          setError("Could not load evaluation results.");
+    // Fetch result with retry — handles race condition where result
+    // may not be immediately available after evaluation completes
+    const fetchWithRetry = async (retries = 3, delay = 2000) => {
+      for (let i = 0; i <= retries; i++) {
+        try {
+          const { status, data } = await api.getResult(id);
+          if (status === 200) {
+            setResult(data);
+            setLoading(false);
+            return;
+          }
+          // If still running (202), wait and retry
+          if (status === 202 && i < retries) {
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+        } catch (err) {
+          if (i === retries) {
+            setError(err.message || "Failed to fetch results.");
+            setLoading(false);
+            return;
+          }
+          await new Promise((r) => setTimeout(r, delay));
         }
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message || "Failed to fetch results.");
-        setLoading(false);
-      });
+      }
+      setError("Could not load evaluation results. Try refreshing the page.");
+      setLoading(false);
+    };
+    fetchWithRetry();
   }, [id]);
 
   const handleNewEvaluation = () => {

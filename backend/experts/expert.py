@@ -44,6 +44,21 @@ class Expert(BaseExpert):
         self._track_call(response.input_tokens, response.output_tokens, response.latency)
         return response.text
 
+    def _call_with_retry(self, system_prompt: str, user_message: str, parse_fn, max_retries: int = 1):
+        """Call LLM and parse response, retrying on JSON parse failure."""
+        last_error = None
+        for attempt in range(1 + max_retries):
+            raw_response = self._call_llm(system_prompt, user_message)
+            try:
+                return raw_response, parse_fn(raw_response)
+            except (ValueError, KeyError) as e:
+                last_error = e
+                if attempt < max_retries:
+                    logger.warning(f"[{self.name}] JSON parse failed (attempt {attempt + 1}), retrying: {e}")
+                else:
+                    logger.error(f"[{self.name}] JSON parse failed after {1 + max_retries} attempts: {e}")
+        raise last_error
+
     def evaluate(self, eval_input: "EvaluationInput", governance_context: str) -> ExpertAssessment:
         """Run full evaluation using dimensions from YAML."""
         logger.info(f"[{self.name}] Starting evaluation of '{eval_input.agent_name}'")
@@ -52,10 +67,7 @@ class Expert(BaseExpert):
             eval_input, governance_context, self.dimensions
         )
 
-        raw_response = self._call_llm(system_prompt, user_message)
-        logger.debug(f"[{self.name}] Raw evaluation response length: {len(raw_response)}")
-
-        data = self._parse_evaluation_response(raw_response)
+        raw_response, data = self._call_with_retry(system_prompt, user_message, self._parse_evaluation_response)
 
         dimension_scores = []
         for ds in data.get("dimension_scores", []):
@@ -123,8 +135,7 @@ class Expert(BaseExpert):
             eval_input, own_assessment, critiques
         )
 
-        raw_response = self._call_llm(system_prompt, user_message)
-        data = self._parse_evaluation_response(raw_response)
+        raw_response, data = self._call_with_retry(system_prompt, user_message, self._parse_evaluation_response)
 
         dimension_scores = []
         for ds in data.get("dimension_scores", []):

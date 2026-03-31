@@ -9,29 +9,35 @@ from experts.llm_providers.google_provider import GoogleProvider
 logger = logging.getLogger(__name__)
 
 # Default provider configurations.
-# Each entry maps a provider key to its class, env var for API key, and default model.
+# Each entry maps a provider key to its class, env var names, and defaults.
+# Env vars are resolved at create() time (not import time) so .env is loaded first.
 # Add new providers here — no other code changes needed.
 DEFAULT_PROVIDERS = {
     "claude": {
         "class": AnthropicProvider,
         "api_key_env": "ANTHROPIC_API_KEY",
-        "default_model": os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
+        "model_env": "CLAUDE_MODEL",
+        "model_default": "claude-sonnet-4-20250514",
     },
     "gpt4o": {
         "class": OpenAIProvider,
         "api_key_env": "OPENAI_API_KEY",
-        "default_model": os.getenv("OPENAI_MODEL", "gpt-4o"),
+        "model_env": "OPENAI_MODEL",
+        "model_default": "gpt-4o",
     },
     "gemini": {
         "class": GoogleProvider,
         "api_key_env": "GOOGLE_API_KEY",
-        "default_model": os.getenv("GEMINI_MODEL", "gemini-1.5-pro"),
+        "model_env": "GEMINI_MODEL",
+        "model_default": "gemini-1.5-pro",
     },
     "local": {
         "class": OpenAIProvider,
         "api_key_env": "LOCAL_API_KEY",
-        "default_model": os.getenv("LOCAL_MODEL", "local-model"),
-        "endpoint": os.getenv("LOCAL_ENDPOINT", "http://localhost:1234/v1"),
+        "model_env": "LOCAL_MODEL",
+        "model_default": "local-model",
+        "endpoint_env": "LOCAL_ENDPOINT",
+        "endpoint_default": "http://localhost:1234/v1",
         "default_api_key": "lm-studio",
     },
 }
@@ -64,10 +70,10 @@ class ProviderRegistry:
         config = self._providers[provider_key]
         provider_class = config["class"]
 
-        # Resolve API key: explicit param > env var > default
+        # Resolve at call time (not import time) so .env is loaded
         resolved_key = api_key or os.getenv(config["api_key_env"], "") or config.get("default_api_key", "")
-        resolved_model = model or config["default_model"]
-        resolved_endpoint = endpoint or config.get("endpoint", "")
+        resolved_model = model or os.getenv(config.get("model_env", ""), config.get("model_default", ""))
+        resolved_endpoint = endpoint or os.getenv(config.get("endpoint_env", ""), config.get("endpoint_default", ""))
 
         kwargs = {
             "model": resolved_model,
@@ -92,9 +98,10 @@ class ProviderRegistry:
         result = {}
         for key, config in self._providers.items():
             available = self.is_available(key)
+            model = os.getenv(config.get("model_env", ""), config.get("model_default", ""))
             result[key] = {
                 "available": available,
-                "model": config["default_model"],
+                "model": model,
             }
             if not available:
                 result[key]["error"] = "API key not configured"

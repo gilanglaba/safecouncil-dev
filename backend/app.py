@@ -208,7 +208,14 @@ def get_evaluation_pdf(eval_id):
     from io import BytesIO
 
     try:
-        result = eval_service.get_result(eval_id)
+        result = evaluation_service.get_result(eval_id)
+
+        # Fall back to log file if not in memory
+        if result is None:
+            log_path = os.path.join(Config.LOG_DIR, f"{eval_id}.json")
+            if os.path.exists(log_path):
+                with open(log_path, "r", encoding="utf-8") as f:
+                    result = json.load(f)
         if result is None:
             return jsonify({"error": "Evaluation not found or still running."}), 404
 

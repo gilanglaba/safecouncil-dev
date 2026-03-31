@@ -97,6 +97,8 @@ class EvaluationService:
         """Return serialized result dict if evaluation is complete."""
         job = self.jobs.get(eval_id)
         if job and job.status == EvalStatus.COMPLETE and job.result:
+            if isinstance(job.result, dict):
+                return job.result
             return job.result.to_dict()
         return None
 
@@ -106,13 +108,22 @@ class EvaluationService:
         for job in self.jobs.values():
             if job.status == EvalStatus.COMPLETE and job.result:
                 r = job.result
-                result.append({
-                    "eval_id": r.eval_id,
-                    "agent_name": r.agent_name,
-                    "verdict": r.final_verdict.value,
-                    "confidence": r.confidence,
-                    "timestamp": r.timestamp,
-                })
+                if isinstance(r, dict):
+                    result.append({
+                        "eval_id": r.get("eval_id", ""),
+                        "agent_name": r.get("agent_name", ""),
+                        "verdict": r.get("verdict", {}).get("final_verdict", "UNKNOWN"),
+                        "confidence": r.get("verdict", {}).get("confidence", 0),
+                        "timestamp": r.get("timestamp", ""),
+                    })
+                else:
+                    result.append({
+                        "eval_id": r.eval_id,
+                        "agent_name": r.agent_name,
+                        "verdict": r.final_verdict.value,
+                        "confidence": r.confidence,
+                        "timestamp": r.timestamp,
+                    })
         return sorted(result, key=lambda x: x["timestamp"], reverse=True)
 
     def _build_steps(self, enabled_experts, input_method=None) -> list:
@@ -270,25 +281,27 @@ class EvaluationService:
                 on_progress=on_progress,
             )
 
-            # Save audit log
-            try:
-                result.save_to_log(Config.LOG_DIR)
-                logger.info(f"[{eval_id}] Audit log saved to {Config.LOG_DIR}/{eval_id}.json")
-            except Exception as e:
-                logger.warning(f"[{eval_id}] Failed to save audit log: {e}")
+            # Normalize result — AggregateOrchestrator returns dict, SimpleOrchestrator returns CouncilResult
+            if isinstance(result, dict):
+                # Add eval_id if missing
+                result["eval_id"] = result.get("eval_id", eval_id)
+                job.result = result
+            else:
+                # CouncilResult object — save audit log
+                try:
+                    result.save_to_log(Config.LOG_DIR)
+                    logger.info(f"[{eval_id}] Audit log saved to {Config.LOG_DIR}/{eval_id}.json")
+                except Exception as e:
+                    logger.warning(f"[{eval_id}] Failed to save audit log: {e}")
+                job.result = result
 
             # Mark complete
-            job.result = result
             job.status = EvalStatus.COMPLETE
             job.progress = 100
             job.current_step = "Evaluation complete"
 
-            logger.info(
-                f"[{eval_id}] Evaluation complete: "
-                f"verdict={result.final_verdict.value}, "
-                f"score=avg({', '.join(str(a.overall_score) for a in result.expert_assessments)}), "
-                f"time={result.evaluation_time_seconds:.1f}s"
-            )
+            verdict_str = result.get("verdict", {}).get("final_verdict", "?") if isinstance(result, dict) else result.final_verdict.value
+            logger.info(f"[{eval_id}] Evaluation complete: verdict={verdict_str}")
 
         except Exception as e:
             logger.error(f"[{eval_id}] Evaluation failed: {e}", exc_info=True)
