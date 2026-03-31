@@ -28,6 +28,7 @@ EVAL_STEPS = [
     "Expert B (GPT-4o) evaluating",
     "Expert C (Gemini) evaluating",
     "Cross-critique round",
+    "Experts revising scores",
     "Council debate & synthesis",
     "Generating final verdict",
 ]
@@ -150,6 +151,7 @@ class EvaluationService:
             ))
 
         steps.append(StepStatus(step="Cross-critique round", status="pending"))
+        steps.append(StepStatus(step="Experts revising scores", status="pending"))
         steps.append(StepStatus(step="Council debate & synthesis", status="pending"))
         steps.append(StepStatus(step="Generating final verdict", status="pending"))
 

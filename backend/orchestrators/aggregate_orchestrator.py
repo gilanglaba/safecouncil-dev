@@ -179,6 +179,7 @@ class AggregateOrchestrator(BaseOrchestrator):
             "agent_name": eval_input.agent_name,
             "orchestrator_method": "aggregate",
             "expert_assessments": [self._assessment_to_dict(a) for a in assessments],
+            "conversations": [{"label": c.label, "prompt": c.prompt, "output": c.output} for c in eval_input.conversations],
             "debate_transcript": transcript,
             "agreements": agreements[:5],
             "disagreements": disagreements[:5],

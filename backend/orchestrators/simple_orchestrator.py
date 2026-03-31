@@ -39,8 +39,9 @@ class SimpleOrchestrator(BaseOrchestrator):
     STEP_EXPERT_B = 2
     STEP_EXPERT_C = 3
     STEP_CRITIQUE = 4
-    STEP_SYNTHESIS = 5
-    STEP_VERDICT = 6
+    STEP_REVISION = 5
+    STEP_SYNTHESIS = 6
+    STEP_VERDICT = 7
 
     def __init__(
         self,
@@ -142,7 +143,24 @@ class SimpleOrchestrator(BaseOrchestrator):
                 critiques.append("{}")  # Empty critique fallback
 
         self._fire_progress(on_progress, self.STEP_CRITIQUE, "complete",
-                            "Cross-critique complete", 80)
+                            "Cross-critique complete", 70)
+
+        # === STEP 5b: Score Revision ===
+        self._fire_progress(on_progress, self.STEP_REVISION, "running",
+                            "Experts revising scores based on critiques...", 70)
+
+        for i, (expert, assessment) in enumerate(zip(self.experts, assessments)):
+            if expert.name in failed_experts:
+                continue
+            try:
+                revised = expert.revise(eval_input, assessment, critiques)
+                assessments[i] = revised
+            except Exception as e:
+                logger.warning(f"[SimpleOrchestrator] Revision by {expert.name} failed: {e}")
+                # Keep original assessment if revision fails
+
+        self._fire_progress(on_progress, self.STEP_REVISION, "complete",
+                            "Score revision complete", 80)
 
         # === STEP 6: Synthesis ===
         self._fire_progress(on_progress, self.STEP_SYNTHESIS, "running",
@@ -255,6 +273,7 @@ class SimpleOrchestrator(BaseOrchestrator):
             eval_id=self.eval_id,
             agent_name=self.agent_name,
             timestamp=datetime.now(timezone.utc).isoformat(),
+            conversations=eval_input.conversations,
         )
 
     def _estimate_cost(self, experts: List["BaseExpert"]) -> float:

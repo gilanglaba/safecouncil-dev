@@ -154,15 +154,19 @@ class Finding:
     text: str
     evidence: str
     framework_ref: Optional[str] = None
+    conversation_index: Optional[int] = None  # 0-based index into conversations list
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "dimension": self.dimension,
             "severity": self.severity.value,
             "text": self.text,
             "evidence": self.evidence,
             "framework_ref": self.framework_ref,
         }
+        if self.conversation_index is not None:
+            d["conversation_index"] = self.conversation_index
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "Finding":
@@ -177,6 +181,7 @@ class Finding:
             text=d.get("text", ""),
             evidence=d.get("evidence", ""),
             framework_ref=d.get("framework_ref"),
+            conversation_index=d.get("conversation_index"),
         )
 
 
@@ -190,9 +195,14 @@ class ExpertAssessment:
     findings: List[Finding]
     raw_response: str
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    # Deliberative revision fields — populated only when scores change after cross-critique
+    initial_overall_score: Optional[int] = None
+    initial_dimension_scores: Optional[List[DimensionScore]] = None
+    revision_rationale: Optional[str] = None
+    score_changes: Optional[List[dict]] = None  # [{dimension, old_score, new_score, influenced_by, justification}]
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "expert_name": self.expert_name,
             "llm_provider": self.llm_provider,
             "overall_score": self.overall_score,
@@ -202,11 +212,19 @@ class ExpertAssessment:
             "raw_response": self.raw_response,
             "timestamp": self.timestamp,
         }
+        if self.initial_overall_score is not None:
+            d["initial_overall_score"] = self.initial_overall_score
+        if self.initial_dimension_scores is not None:
+            d["initial_dimension_scores"] = [ds.to_dict() for ds in self.initial_dimension_scores]
+        if self.revision_rationale:
+            d["revision_rationale"] = self.revision_rationale
+        if self.score_changes:
+            d["score_changes"] = self.score_changes
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "ExpertAssessment":
         verdict_str = d.get("verdict", "CONDITIONAL").upper()
-        # Handle "NO-GO" vs "NO_GO"
         if verdict_str == "NO-GO":
             verdict = Verdict.NO_GO
         else:
@@ -214,6 +232,9 @@ class ExpertAssessment:
                 verdict = Verdict[verdict_str.replace("-", "_")]
             except KeyError:
                 verdict = Verdict.CONDITIONAL
+        initial_dims = None
+        if d.get("initial_dimension_scores"):
+            initial_dims = [DimensionScore.from_dict(ds) for ds in d["initial_dimension_scores"]]
         return cls(
             expert_name=d.get("expert_name", ""),
             llm_provider=d.get("llm_provider", ""),
@@ -225,6 +246,10 @@ class ExpertAssessment:
             findings=[Finding.from_dict(f) for f in d.get("findings", [])],
             raw_response=d.get("raw_response", ""),
             timestamp=d.get("timestamp", datetime.now(timezone.utc).isoformat()),
+            initial_overall_score=d.get("initial_overall_score"),
+            initial_dimension_scores=initial_dims,
+            revision_rationale=d.get("revision_rationale"),
+            score_changes=d.get("score_changes"),
         )
 
 
@@ -308,9 +333,10 @@ class CouncilResult:
     agent_name: str
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     orchestrator_method: str = "deliberative"
+    conversations: List[Conversation] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "eval_id": self.eval_id,
             "agent_name": self.agent_name,
             "orchestrator_method": self.orchestrator_method,
@@ -325,6 +351,7 @@ class CouncilResult:
             "agreements": self.agreements,
             "disagreements": self.disagreements,
             "mitigations": [m.to_dict() for m in self.mitigations],
+            "conversations": [c.to_dict() for c in self.conversations],
             "audit": {
                 "total_api_calls": self.total_api_calls,
                 "total_tokens_used": self.total_tokens_used,
@@ -332,6 +359,7 @@ class CouncilResult:
                 "evaluation_time_seconds": round(self.evaluation_time_seconds, 1),
             },
         }
+        return d
 
     def save_to_log(self, log_dir: str) -> str:
         """Save the complete result to a JSON audit log file."""

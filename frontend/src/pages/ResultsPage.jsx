@@ -98,7 +98,23 @@ function ExpertCard({ assessment }) {
             <div style={{ fontSize: 13, color: theme.textTer }}>/100</div>
             <VerdictBadge verdict={assessment.verdict} size="sm" />
           </div>
+          {/* Score evolution for deliberative results */}
+          {assessment.initial_overall_score != null && assessment.initial_overall_score !== assessment.overall_score && (
+            <div style={{ fontSize: 12, color: theme.textTer, marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontFamily: theme.fontMono, textDecoration: "line-through", opacity: 0.5 }}>{assessment.initial_overall_score}</span>
+              <span>→</span>
+              <span style={{ fontFamily: theme.fontMono, fontWeight: 700, color: assessment.overall_score > assessment.initial_overall_score ? theme.green : theme.red }}>
+                {assessment.overall_score > assessment.initial_overall_score ? "+" : ""}{assessment.overall_score - assessment.initial_overall_score}
+              </span>
+            </div>
+          )}
         </div>
+        {/* Revision rationale */}
+        {assessment.revision_rationale && (
+          <div style={{ fontSize: 11, color: theme.textTer, fontStyle: "italic", marginBottom: 8, lineHeight: 1.4 }}>
+            {assessment.revision_rationale}
+          </div>
+        )}
 
         {/* Category scores — color-coded number only */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -421,6 +437,17 @@ function ExpertComparisonTab({ result }) {
 function DeliberationTab({ result }) {
   const [filter, setFilter] = useState("All");
   const messages = result.debate_transcript || [];
+  const assessments = result.expert_assessments || [];
+
+  // Collect all score changes across experts
+  const allScoreChanges = [];
+  for (const a of assessments) {
+    if (a.score_changes && a.score_changes.length > 0) {
+      for (const sc of a.score_changes) {
+        allScoreChanges.push({ ...sc, expert_name: a.expert_name });
+      }
+    }
+  }
 
   const speakers = ["All", ...new Set(
     messages.filter((m) => m.message_type !== "resolution" && m.speaker !== "Council").map((m) => m.speaker)
@@ -434,6 +461,85 @@ function DeliberationTab({ result }) {
 
   return (
     <div>
+      {/* Score Movement section — the real deliberation record */}
+      {allScoreChanges.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+            Score Revisions After Deliberation
+          </div>
+          <p style={{ fontSize: 12, color: theme.textTer, marginBottom: 12, lineHeight: 1.4 }}>
+            These scores changed after experts reviewed each other's critiques. Each change is traceable to a specific argument.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {allScoreChanges.map((sc, i) => {
+              const delta = sc.new_score - sc.old_score;
+              const isUp = delta > 0;
+              return (
+                <div key={i} style={{
+                  display: "flex", alignItems: "flex-start", gap: 14, padding: "12px 16px",
+                  background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: theme.radius,
+                  borderLeft: `4px solid ${isUp ? theme.green : theme.red}`,
+                }}>
+                  <div style={{ flexShrink: 0, textAlign: "center", minWidth: 60 }}>
+                    <div style={{ fontFamily: theme.fontMono, fontSize: 12, color: theme.textTer, textDecoration: "line-through" }}>{sc.old_score}</div>
+                    <div style={{ fontFamily: theme.fontMono, fontSize: 18, fontWeight: 700, color: isUp ? theme.green : theme.red }}>{sc.new_score}</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: isUp ? theme.green : theme.red }}>{isUp ? "+" : ""}{delta}</div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>{sc.dimension}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: theme.textSec, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600, color: getSpeakerColor(sc.expert_name) }}>{sc.expert_name}</span>
+                      {" revised after critique from "}
+                      <span style={{ fontWeight: 600 }}>{sc.influenced_by}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: theme.textTer, lineHeight: 1.4, fontStyle: "italic" }}>
+                      "{sc.justification}"
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Contested dimensions — still disagreed after revision */}
+          {(() => {
+            const contested = [];
+            const dimScoresMap = {};
+            for (const a of assessments) {
+              for (const ds of (a.dimension_scores || [])) {
+                if (!dimScoresMap[ds.dimension]) dimScoresMap[ds.dimension] = [];
+                dimScoresMap[ds.dimension].push({ expert: a.expert_name, score: ds.score });
+              }
+            }
+            for (const [dim, entries] of Object.entries(dimScoresMap)) {
+              const scores = entries.map(e => e.score);
+              if (scores.length >= 2 && Math.max(...scores) - Math.min(...scores) > 20) {
+                contested.push({ dimension: dim, entries, spread: Math.max(...scores) - Math.min(...scores) });
+              }
+            }
+            if (contested.length === 0) return null;
+            return (
+              <div style={{ marginTop: 16, padding: "12px 16px", background: theme.amberPale, border: `1px solid ${theme.amber}30`, borderRadius: theme.radius }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: theme.amber, marginBottom: 8 }}>
+                  ⚠ Contested Dimensions (still disagreed after deliberation)
+                </div>
+                {contested.map((c, i) => (
+                  <div key={i} style={{ fontSize: 12, color: theme.text, marginBottom: 4 }}>
+                    <strong>{c.dimension}</strong> — spread: {c.spread}pts ({c.entries.map(e => `${e.expert}: ${e.score}`).join(", ")})
+                  </div>
+                ))}
+                <div style={{ fontSize: 11, color: theme.amber, marginTop: 6 }}>
+                  These dimensions require human reviewer attention. The council could not reach consensus.
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Speaker filter */}
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
         {speakers.map((s) => (
           <button
@@ -625,6 +731,21 @@ function FindingsTab({ result }) {
                       {f.framework_ref && <span style={{ marginLeft: 8, color: theme.unBlueDark, fontStyle: "normal", fontWeight: 600 }}>{f.framework_ref}</span>}
                     </div>
                   )}
+                  {f.conversation_index != null && (result.conversations || [])[f.conversation_index] && (
+                    <details style={{ marginTop: 6 }}>
+                      <summary style={{ fontSize: 11, color: theme.violet, cursor: "pointer", fontWeight: 600 }}>View source conversation #{f.conversation_index + 1}</summary>
+                      <div style={{ marginTop: 8, padding: 10, background: theme.bgWarm, borderRadius: 6, fontSize: 12 }}>
+                        <div style={{ marginBottom: 6 }}>
+                          <span style={{ fontWeight: 700, color: theme.textTer, fontSize: 10, textTransform: "uppercase" }}>User Prompt</span>
+                          <p style={{ margin: "2px 0 0", color: theme.text, lineHeight: 1.5 }}>{result.conversations[f.conversation_index].prompt}</p>
+                        </div>
+                        <div>
+                          <span style={{ fontWeight: 700, color: theme.textTer, fontSize: 10, textTransform: "uppercase" }}>Agent Response</span>
+                          <p style={{ margin: "2px 0 0", color: theme.text, lineHeight: 1.5 }}>{result.conversations[f.conversation_index].output}</p>
+                        </div>
+                      </div>
+                    </details>
+                  )}
                 </div>
               ))}
             </div>
@@ -802,6 +923,91 @@ function ComplianceTab({ result }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Tab: Evidence Log — shows the actual conversations that were evaluated
+// ─────────────────────────────────────────────────────────────────────────────
+
+function EvidenceLogTab({ result }) {
+  const conversations = result.conversations || [];
+  const [expanded, setExpanded] = useState({});
+
+  // Count findings per conversation
+  const findingCounts = {};
+  for (const a of (result.expert_assessments || [])) {
+    for (const f of (a.findings || [])) {
+      if (f.conversation_index != null) {
+        findingCounts[f.conversation_index] = (findingCounts[f.conversation_index] || 0) + 1;
+      }
+    }
+  }
+
+  if (conversations.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: 40, color: theme.textSec }}>
+        No conversation data available. Conversations are included when the evaluation is run via Tool Catalog, Connect API, or Upload.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: theme.textTer, marginBottom: 20, lineHeight: 1.5 }}>
+        These are the actual probe questions and AI responses that were evaluated by the expert panel.
+        Findings reference specific conversations by index.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {conversations.map((conv, i) => {
+          const isExpanded = expanded[i];
+          const count = findingCounts[i] || 0;
+          return (
+            <div key={i} style={{
+              border: `1px solid ${count > 0 ? theme.amber + "44" : theme.border}`,
+              borderLeft: count > 0 ? `4px solid ${theme.amber}` : `1px solid ${theme.border}`,
+              borderRadius: theme.radius,
+              overflow: "hidden",
+            }}>
+              <div
+                onClick={() => setExpanded({ ...expanded, [i]: !isExpanded })}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 16px", cursor: "pointer", background: theme.bgWarm,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontFamily: theme.fontMono, fontSize: 12, fontWeight: 700, color: theme.textTer, minWidth: 24 }}>#{i + 1}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>{conv.label || `Conversation ${i + 1}`}</span>
+                  {count > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: theme.amber + "18", color: theme.amber }}>
+                      {count} finding{count !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: 12, color: theme.textTer }}>{isExpanded ? "▾" : "▸"}</span>
+              </div>
+              {isExpanded && (
+                <div style={{ padding: "14px 16px" }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>User Prompt</div>
+                    <div style={{ fontSize: 13, color: theme.text, lineHeight: 1.6, background: theme.bgWarm, padding: 12, borderRadius: 6 }}>
+                      {conv.prompt}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Agent Response</div>
+                    <div style={{ fontSize: 13, color: theme.text, lineHeight: 1.6, background: theme.bgWarm, padding: 12, borderRadius: 6 }}>
+                      {conv.output}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Results View
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -821,6 +1027,7 @@ function ResultsView({ result, onDownloadPDF }) {
     { id: "overview", label: "Overview" },
     { id: "scores", label: "Score Comparison" },
     { id: "compliance", label: "Compliance" },
+    { id: "evidence", label: "Evidence Log" },
     { id: "council", label: isDeliberative ? "Council Deliberation" : "Expert Comparison" },
     { id: "findings", label: "All Findings" },
     { id: "actions", label: "Action Items" },
@@ -932,6 +1139,7 @@ function ResultsView({ result, onDownloadPDF }) {
       {activeTab === "overview" && <OverviewTab result={result} />}
       {activeTab === "scores" && <ScoreComparisonTab result={result} />}
       {activeTab === "compliance" && <ComplianceTab result={result} />}
+      {activeTab === "evidence" && <EvidenceLogTab result={result} />}
       {activeTab === "council" && (isDeliberative ? <DeliberationTab result={result} /> : <ExpertComparisonTab result={result} />)}
       {activeTab === "findings" && <FindingsTab result={result} />}
       {activeTab === "actions" && <ActionItemsTab result={result} onDownloadPDF={onDownloadPDF} />}

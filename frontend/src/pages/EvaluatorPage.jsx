@@ -770,6 +770,7 @@ function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onCo
         "Expert 2 (GPT-4o) evaluating...",
         "Expert 3 (Gemini) evaluating...",
         "Cross-critique: Experts reviewing each other",
+        "Experts revising scores",
         "Council debate & synthesis",
         "Generating final verdict & mitigations",
       ];
@@ -788,9 +789,10 @@ function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onCo
         [300,   snap(1, 15, "Expert 1 (Claude) evaluating...")],
         [700,   snap(2, 30, "Expert 2 (GPT-4o) evaluating...")],
         [1100,  snap(3, 50, "Expert 3 (Gemini) evaluating...")],
-        [1500,  snap(4, 65, "Cross-critique: Experts reviewing each other...")],
-        [1900,  snap(5, 82, "Council debate & synthesis...")],
-        [2300,  snap(6, 94, "Generating final verdict & mitigations...")],
+        [1500,  snap(4, 58, "Cross-critique: Experts reviewing each other...")],
+        [1800,  snap(5, 70, "Experts revising scores...")],
+        [2100,  snap(6, 84, "Council debate & synthesis...")],
+        [2400,  snap(7, 94, "Generating final verdict & mitigations...")],
         [2700, {
           progress: 100,
           current_step: "Evaluation complete",

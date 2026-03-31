@@ -93,7 +93,8 @@ You MUST respond with a single JSON object. Think through each dimension careful
       "severity": "CRITICAL" | "HIGH" | "MEDIUM" | "LOW",
       "text": "<finding description>",
       "evidence": "<specific quote or reference from conversations>",
-      "framework_ref": "<relevant framework reference, if any>"
+      "framework_ref": "<relevant framework reference, if any>",
+      "conversation_index": "<0-based index of the conversation this finding relates to, or null>"
     }}
   ]
 }}
