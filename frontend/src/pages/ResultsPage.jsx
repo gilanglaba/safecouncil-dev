@@ -1164,16 +1164,15 @@ export default function ResultsPage() {
       setLoading(false);
       return;
     }
-    if (id === "demo-wfp2" || id === "demo-unicef") {
+    if (id === "demo-unicef") {
       setResult({ ...DEMO_RESULT_AGGREGATE, timestamp: new Date().toISOString() });
       setLoading(false);
       return;
     }
 
-    // Fetch result with retry — handles race condition where result
-    // may not be immediately available after evaluation completes
-    const fetchWithRetry = async (retries = 3, delay = 2000) => {
-      for (let i = 0; i <= retries; i++) {
+    const fetchResult = async () => {
+      // Retry up to 5 times with 3-second delays for 202 (still running)
+      for (let attempt = 0; attempt < 5; attempt++) {
         try {
           const { status, data } = await api.getResult(id);
           if (status === 200) {
@@ -1181,24 +1180,34 @@ export default function ResultsPage() {
             setLoading(false);
             return;
           }
-          // If still running (202), wait and retry
-          if (status === 202 && i < retries) {
-            await new Promise((r) => setTimeout(r, delay));
-            continue;
-          }
-        } catch (err) {
-          if (i === retries) {
-            setError(err.message || "Failed to fetch results.");
+          if (status === 404) {
+            setError("Evaluation not found. It may have been lost after a server restart.");
             setLoading(false);
             return;
           }
-          await new Promise((r) => setTimeout(r, delay));
+          if (status === 500) {
+            setError(data?.error || "Evaluation failed. Check the backend logs.");
+            setLoading(false);
+            return;
+          }
+          if (status === 202) {
+            // Still running — wait and retry
+            await new Promise((r) => setTimeout(r, 3000));
+            continue;
+          }
+        } catch (err) {
+          if (attempt === 4) {
+            setError(err.message || "Failed to connect to the server.");
+            setLoading(false);
+            return;
+          }
+          await new Promise((r) => setTimeout(r, 2000));
         }
       }
-      setError("Could not load evaluation results. Try refreshing the page.");
+      setError("Evaluation is still running. Please wait and refresh the page.");
       setLoading(false);
     };
-    fetchWithRetry();
+    fetchResult();
   }, [id]);
 
   const handleNewEvaluation = () => {

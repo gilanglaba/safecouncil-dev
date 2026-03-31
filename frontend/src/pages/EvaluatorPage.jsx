@@ -854,12 +854,17 @@ function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onCo
     // ── Real mode: poll backend ───────────────────────────────────────────
     if (!evalId) return;
 
+    let done = false; // Prevent double onComplete from race condition
+
     const poll = async () => {
+      if (done) return;
       try {
         const status = await api.getStatus(evalId);
+        if (done) return;
         setStatusData(status);
 
         if (status.status === "complete") {
+          done = true;
           clearInterval(intervalRef.current);
           const { status: httpStatus, data } = await api.getResult(evalId);
           if (httpStatus === 200) {
@@ -868,10 +873,13 @@ function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onCo
             onError("Evaluation complete but result could not be fetched.");
           }
         } else if (status.status === "failed") {
+          done = true;
           clearInterval(intervalRef.current);
           onError(status.error || "Evaluation failed. Check backend logs.");
         }
       } catch (e) {
+        if (done) return;
+        done = true;
         clearInterval(intervalRef.current);
         onError(`Connection error: ${e.message}. Is the Flask server running?`);
       }
@@ -879,7 +887,7 @@ function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onCo
 
     poll();
     intervalRef.current = setInterval(poll, 2000);
-    return () => clearInterval(intervalRef.current);
+    return () => { done = true; clearInterval(intervalRef.current); };
   }, [evalId, demoMode]);
 
   const steps = statusData?.steps_completed || [];
