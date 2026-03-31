@@ -6,7 +6,7 @@ import VerdictBadge from "../components/VerdictBadge";
 import { downloadPDF } from "../utils/generatePDF";
 import { theme } from "../theme";
 import { api } from "../api";
-import { DEMO_RESULT } from "../demoResult";
+import { DEMO_RESULT, DEMO_RESULT_AGGREGATE } from "../demoResult";
 
 function formatDate(timestamp) {
   if (!timestamp) return "—";
@@ -20,14 +20,26 @@ function formatDate(timestamp) {
 }
 
 // Demo/dummy evaluation card data
-const DUMMY_EVALUATION = {
-  eval_id: "demo-001",
-  agent_name: "WFP Support Bot (Demo)",
-  verdict: "CONDITIONAL",
-  confidence: 89,
-  timestamp: "2026-03-15T14:30:00Z",
-  is_demo: true,
-};
+const DUMMY_EVALUATIONS = [
+  {
+    eval_id: "demo-wfp1",
+    agent_name: "WFP Support Bot (Deliberative)",
+    verdict: "CONDITIONAL",
+    confidence: 78,
+    timestamp: "2026-03-15T14:30:00Z",
+    is_demo: true,
+    orchestrator_method: "deliberative",
+  },
+  {
+    eval_id: "demo-unicef",
+    agent_name: "UNICEF-GPT (Aggregate)",
+    verdict: "GO",
+    confidence: 91,
+    timestamp: "2026-03-15T15:00:00Z",
+    is_demo: true,
+    orchestrator_method: "aggregate",
+  },
+];
 
 function EvalCard({ evaluation, onSeeDetail, onDownloadPDF }) {
   const [hovered, setHovered] = useState(false);
@@ -79,7 +91,7 @@ function EvalCard({ evaluation, onSeeDetail, onDownloadPDF }) {
         )}
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            onClick={() => onSeeDetail(evaluation.eval_id, isDemo)}
+            onClick={() => onSeeDetail(evaluation.eval_id)}
             style={{
               padding: "8px 16px",
               borderRadius: 8,
@@ -138,14 +150,15 @@ export default function DashboardPage() {
       });
   }, []);
 
-  const handleSeeDetail = (evalId, isDemo) => {
-    navigate(`/results/${isDemo ? "demo" : evalId}`);
+  const handleSeeDetail = (evalId) => {
+    navigate(`/results/${evalId}`);
   };
 
   const handleDownloadPDF = async (evalId, isDemo) => {
     try {
       if (isDemo) {
-        downloadPDF({ ...DEMO_RESULT, timestamp: new Date().toISOString() });
+        const demoData = evalId === "demo-unicef" ? DEMO_RESULT_AGGREGATE : DEMO_RESULT;
+        downloadPDF({ ...demoData, timestamp: new Date().toISOString() });
         return;
       }
       const { status, data } = await api.getResult(evalId);
@@ -161,9 +174,11 @@ export default function DashboardPage() {
 
   // Combine real evaluations with dummy
   const allEvaluations = [...evaluations];
-  const hasDummy = evaluations.length === 0 || !evaluations.some(e => e.eval_id === DUMMY_EVALUATION.eval_id);
-  if (hasDummy) {
-    allEvaluations.push(DUMMY_EVALUATION);
+  // Add dummy demo cards if not already present
+  for (const dummy of DUMMY_EVALUATIONS) {
+    if (!evaluations.some(e => e.eval_id === dummy.eval_id)) {
+      allEvaluations.push(dummy);
+    }
   }
 
 

@@ -8,7 +8,7 @@ import SeverityBadge from "../components/SeverityBadge";
 import Badge from "../components/Badge";
 import { theme, getSpeakerColor, getScoreColor } from "../theme";
 import { api } from "../api";
-import { DEMO_RESULT } from "../demoResult";
+import { DEMO_RESULT, DEMO_RESULT_AGGREGATE } from "../demoResult";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -174,7 +174,7 @@ function OverviewTab({ result }) {
         </div>
         <p style={{ margin: 0 }}>
           <strong>{result.agent_name}</strong> received a <strong style={{ color: vc }}>{verdict.final_verdict}</strong> deployment
-          verdict from a panel of {assessments.length} independent AI experts.
+          verdict from a panel of {assessments.length} independent AI experts using the <strong>{(result.orchestrator_method || "deliberative") === "deliberative" ? "Deliberative" : "Aggregate"}</strong> method.
           The average safety score is <strong style={{ color: getScoreColor(avgScore) }}>{avgScore}/100 ({scoreLabel(avgScore)})</strong>.
           {criticalCount > 0
             ? ` The council identified ${criticalCount} critical/high-severity finding${criticalCount !== 1 ? "s" : ""} requiring remediation before deployment.`
@@ -337,7 +337,85 @@ function ScoreComparisonTab({ result }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tab: Council Deliberation (#5 renamed from Expert Debate)
+// Tab: Expert Comparison (Method A: Aggregate)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ExpertComparisonTab({ result }) {
+  const assessments = result.expert_assessments || [];
+  if (!assessments.length) return <p style={{ color: theme.textSec }}>No assessment data available.</p>;
+
+  const allDimensions = [];
+  const seen = new Set();
+  for (const a of assessments) {
+    for (const d of (a.dimension_scores || [])) {
+      if (!seen.has(d.dimension)) {
+        seen.add(d.dimension);
+        allDimensions.push({ dimension: d.dimension, category: d.category });
+      }
+    }
+  }
+  const byCategory = {};
+  for (const d of allDimensions) {
+    if (!byCategory[d.category]) byCategory[d.category] = [];
+    byCategory[d.category].push(d.dimension);
+  }
+  const getDimData = (assessment, dimension) =>
+    (assessment.dimension_scores || []).find((d) => d.dimension === dimension);
+
+  return (
+    <div>
+      <div style={{
+        padding: "12px 18px", background: theme.unBluePale, border: `1px solid ${theme.unBlue}22`,
+        borderRadius: theme.radiusMd, marginBottom: 20, fontSize: 13, color: theme.unBlueDark,
+      }}>
+        This evaluation used the <strong>Aggregate</strong> method. Each expert evaluated independently — no cross-critique or debate was performed. The final verdict was determined by statistical averaging and majority vote.
+      </div>
+
+      {Object.entries(byCategory).map(([category, dimensions]) => (
+        <div key={category} style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>{category}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {dimensions.map((dim) => {
+              const scores = assessments.map((a) => getDimData(a, dim)).filter(Boolean);
+              const vals = scores.map((s) => s.score);
+              const hasDisagreement = vals.length >= 2 && Math.max(...vals) - Math.min(...vals) > 15;
+              return (
+                <div key={dim} style={{
+                  background: theme.surface, borderRadius: theme.radius, padding: "14px 18px",
+                  border: `1px solid ${hasDisagreement ? theme.amber + "44" : theme.border}`,
+                  borderLeft: hasDisagreement ? `4px solid ${theme.amber}` : `1px solid ${theme.border}`,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{dim}</span>
+                    {hasDisagreement && <span style={{ fontSize: 11, color: theme.amber, fontWeight: 600 }}>⚠ Experts disagree ({Math.min(...vals)}–{Math.max(...vals)})</span>}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${assessments.length}, 1fr)`, gap: 12 }}>
+                    {assessments.map((a) => {
+                      const d = getDimData(a, dim);
+                      if (!d) return null;
+                      return (
+                        <div key={a.expert_name} style={{ borderLeft: `2px solid ${getSpeakerColor(a.expert_name)}20`, paddingLeft: 10 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: getSpeakerColor(a.expert_name) }}>{a.expert_name}</span>
+                            <span style={{ fontFamily: theme.fontMono, fontSize: 13, fontWeight: 700, color: getScoreColor(d.score) }}>{d.score}</span>
+                          </div>
+                          <p style={{ fontSize: 12, color: theme.textSec, lineHeight: 1.4, margin: 0 }}>{d.detail}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tab: Council Deliberation (Method B: Deliberate)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DeliberationTab({ result }) {
@@ -737,11 +815,13 @@ function ResultsView({ result, onDownloadPDF }) {
   };
   const vc = verdictColors[verdict.final_verdict] || verdictColors.CONDITIONAL;
 
+  const isDeliberative = (result.orchestrator_method || "deliberative") === "deliberative";
+
   const TABS = [
     { id: "overview", label: "Overview" },
     { id: "scores", label: "Score Comparison" },
     { id: "compliance", label: "Compliance" },
-    { id: "deliberation", label: "Council Deliberation" },
+    { id: "council", label: isDeliberative ? "Council Deliberation" : "Expert Comparison" },
     { id: "findings", label: "All Findings" },
     { id: "actions", label: "Action Items" },
   ];
@@ -770,6 +850,14 @@ function ResultsView({ result, onDownloadPDF }) {
         {/* Left: verdict + score + explanation */}
         <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
           <VerdictBadge verdict={verdict.final_verdict} size="xl" />
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, letterSpacing: "0.04em",
+            background: isDeliberative ? theme.violet + "18" : theme.unBlue + "18",
+            color: isDeliberative ? theme.violet : theme.unBlueDark,
+            border: `1px solid ${isDeliberative ? theme.violet + "33" : theme.unBlue + "33"}`,
+          }}>
+            {isDeliberative ? "DELIBERATIVE" : "AGGREGATE"}
+          </span>
           <div style={{ fontSize: 28, fontWeight: 800, fontFamily: theme.fontMono, color: getScoreColor(avgScore), lineHeight: 1 }}>
             {avgScore}<span style={{ fontSize: 14, fontWeight: 500, color: vc.text, opacity: 0.6 }}>/100</span>
           </div>
@@ -844,7 +932,7 @@ function ResultsView({ result, onDownloadPDF }) {
       {activeTab === "overview" && <OverviewTab result={result} />}
       {activeTab === "scores" && <ScoreComparisonTab result={result} />}
       {activeTab === "compliance" && <ComplianceTab result={result} />}
-      {activeTab === "deliberation" && <DeliberationTab result={result} />}
+      {activeTab === "council" && (isDeliberative ? <DeliberationTab result={result} /> : <ExpertComparisonTab result={result} />)}
       {activeTab === "findings" && <FindingsTab result={result} />}
       {activeTab === "actions" && <ActionItemsTab result={result} onDownloadPDF={onDownloadPDF} />}
     </div>
@@ -863,8 +951,13 @@ export default function ResultsPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (id === "demo") {
+    if (id === "demo" || id === "demo-wfp1") {
       setResult({ ...DEMO_RESULT, timestamp: new Date().toISOString() });
+      setLoading(false);
+      return;
+    }
+    if (id === "demo-wfp2" || id === "demo-unicef") {
+      setResult({ ...DEMO_RESULT_AGGREGATE, timestamp: new Date().toISOString() });
       setLoading(false);
       return;
     }

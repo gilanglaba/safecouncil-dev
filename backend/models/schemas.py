@@ -307,11 +307,13 @@ class CouncilResult:
     eval_id: str
     agent_name: str
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    orchestrator_method: str = "deliberative"
 
     def to_dict(self) -> dict:
         return {
             "eval_id": self.eval_id,
             "agent_name": self.agent_name,
+            "orchestrator_method": self.orchestrator_method,
             "timestamp": self.timestamp,
             "verdict": {
                 "final_verdict": self.final_verdict.value,
