@@ -24,15 +24,19 @@ class OpenAIProvider(LLMProvider):
     def call(self, system_prompt: str, user_message: str, max_tokens: int = 4096) -> LLMResponse:
         start = time.time()
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                max_tokens=max_tokens,
-                response_format={"type": "json_object"},
-                messages=[
+            kwargs = {
+                "model": self.model,
+                "max_tokens": max_tokens,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
-            )
+            }
+            # Only use json_object format for OpenAI API — local LLMs may not support it
+            if not self.endpoint or "localhost" not in self.endpoint and "127.0.0.1" not in self.endpoint:
+                kwargs["response_format"] = {"type": "json_object"}
+
+            response = self.client.chat.completions.create(**kwargs)
             latency = time.time() - start
             usage = response.usage
             result = LLMResponse(
