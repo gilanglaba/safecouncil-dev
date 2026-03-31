@@ -174,10 +174,13 @@ class AggregateOrchestrator(BaseOrchestrator):
 
         elapsed = time.time() - start_time
 
+        from datetime import datetime, timezone
+
         return {
             "eval_id": "",  # Set by EvaluationService after return
             "agent_name": eval_input.agent_name,
             "orchestrator_method": "aggregate",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "expert_assessments": [self._assessment_to_dict(a) for a in assessments],
             "conversations": [{"label": c.label, "prompt": c.prompt, "output": c.output} for c in eval_input.conversations],
             "debate_transcript": transcript,
