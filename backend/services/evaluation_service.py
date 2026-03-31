@@ -61,7 +61,7 @@ class EvaluationService:
 
         # Build initial steps based on which experts are enabled
         enabled_experts = [e for e in eval_input.experts if e.enabled]
-        steps = self._build_steps(enabled_experts, eval_input.input_method)
+        steps = self._build_steps(enabled_experts, eval_input.input_method, eval_input.orchestration_method)
 
         job = EvalJob(
             eval_id=eval_id,
@@ -126,8 +126,8 @@ class EvaluationService:
                     })
         return sorted(result, key=lambda x: x["timestamp"], reverse=True)
 
-    def _build_steps(self, enabled_experts, input_method=None) -> list:
-        """Build step list, prepending probe steps when input_method == 'api_probe'."""
+    def _build_steps(self, enabled_experts, input_method=None, orchestration_method=None) -> list:
+        """Build step list based on orchestration method and input method."""
         expert_step_names = {
             "claude": "Expert A (Claude) evaluating",
             "gpt4o": "Expert B (GPT-4o) evaluating",
@@ -161,10 +161,15 @@ class EvaluationService:
                 status="skipped",
             ))
 
-        steps.append(StepStatus(step="Cross-critique round", status="pending"))
-        steps.append(StepStatus(step="Experts revising scores", status="pending"))
-        steps.append(StepStatus(step="Council debate & synthesis", status="pending"))
-        steps.append(StepStatus(step="Generating final verdict", status="pending"))
+        is_deliberative = (orchestration_method or "deliberative") == "deliberative"
+
+        if is_deliberative:
+            steps.append(StepStatus(step="Cross-critique round", status="pending"))
+            steps.append(StepStatus(step="Experts revising scores", status="pending"))
+            steps.append(StepStatus(step="Council debate & synthesis", status="pending"))
+            steps.append(StepStatus(step="Generating final verdict", status="pending"))
+        else:
+            steps.append(StepStatus(step="Aggregating scores", status="pending"))
 
         return steps
 
