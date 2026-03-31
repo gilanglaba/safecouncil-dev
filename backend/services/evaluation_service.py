@@ -284,7 +284,7 @@ class EvaluationService:
             # Normalize result — AggregateOrchestrator returns dict, SimpleOrchestrator returns CouncilResult
             if isinstance(result, dict):
                 # Add eval_id if missing
-                result["eval_id"] = result.get("eval_id", eval_id)
+                result["eval_id"] = eval_id
                 job.result = result
             else:
                 # CouncilResult object — save audit log

@@ -175,7 +175,7 @@ class AggregateOrchestrator(BaseOrchestrator):
         elapsed = time.time() - start_time
 
         return {
-            "eval_id": eval_input.agent_name,
+            "eval_id": "",  # Set by EvaluationService after return
             "agent_name": eval_input.agent_name,
             "orchestrator_method": "aggregate",
             "expert_assessments": [self._assessment_to_dict(a) for a in assessments],
