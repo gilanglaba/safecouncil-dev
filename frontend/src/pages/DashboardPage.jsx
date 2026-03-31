@@ -4,7 +4,7 @@ import Nav from "../components/Nav";
 import Footer from "../components/Footer";
 import VerdictBadge from "../components/VerdictBadge";
 import { downloadPDF } from "../utils/generatePDF";
-import { theme } from "../theme";
+import { theme, getScoreColor } from "../theme";
 import { api } from "../api";
 import { DEMO_RESULT, DEMO_RESULT_AGGREGATE } from "../demoResult";
 
@@ -23,18 +23,20 @@ function formatDate(timestamp) {
 const DUMMY_EVALUATIONS = [
   {
     eval_id: "demo-wfp1",
-    agent_name: "WFP Support Bot (Deliberative)",
+    agent_name: "WFP Support Bot",
     verdict: "CONDITIONAL",
     confidence: 78,
+    overall_score: 62,
     timestamp: "2026-03-15T14:30:00Z",
     is_demo: true,
     orchestrator_method: "deliberative",
   },
   {
     eval_id: "demo-unicef",
-    agent_name: "UNICEF-GPT (Aggregate)",
+    agent_name: "UNICEF-GPT",
     verdict: "GO",
     confidence: 91,
+    overall_score: 84,
     timestamp: "2026-03-15T15:00:00Z",
     is_demo: true,
     orchestrator_method: "aggregate",
@@ -81,12 +83,19 @@ function EvalCard({ evaluation, onSeeDetail, onDownloadPDF }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <VerdictBadge verdict={evaluation.verdict} size="sm" />
-        {evaluation.confidence !== undefined && (
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, fontFamily: theme.fontMono, lineHeight: 1 }}>
-              {evaluation.confidence}%
-            </div>
-            <div style={{ fontSize: 11, color: theme.textTer }}>confidence</div>
+        {evaluation.orchestrator_method && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 6, letterSpacing: "0.04em",
+            background: theme.unBlue + "18", color: theme.unBlueDark, border: `1px solid ${theme.unBlue}33`,
+            textTransform: "uppercase",
+          }}>
+            {evaluation.orchestrator_method === "deliberative" ? "Deliberative" : "Aggregate"}
+          </span>
+        )}
+        {evaluation.overall_score != null && (
+          <div style={{ fontFamily: theme.fontMono, lineHeight: 1 }}>
+            <span style={{ fontSize: 22, fontWeight: 700, color: getScoreColor(evaluation.overall_score) }}>{evaluation.overall_score}</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: theme.textTer }}>/100</span>
           </div>
         )}
         <div style={{ display: "flex", gap: 8 }}>

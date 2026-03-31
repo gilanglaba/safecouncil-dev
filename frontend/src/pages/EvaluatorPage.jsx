@@ -671,31 +671,28 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
       {/* ── SECTION 4: Orchestration Method ────────────────────────────────── */}
       <div style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 28, marginBottom: 16 }}>
         <SectionHead num="4" title="Council Method" />
-        <p style={{ fontSize: 13, color: theme.textTer, margin: "-12px 0 16px", lineHeight: 1.5 }}>
-          Choose how the council of experts reaches its verdict. Both methods use the same experts and rubric — only the consensus process differs.
-        </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[
             {
               id: "deliberative",
-              label: "Deliberate",
+              label: "Deliberative",
               icon: "💬",
-              desc: "Experts evaluate independently, then cross-critique each other's assessments and debate to reach a reasoned consensus.",
-              detail: "Produces a full debate transcript. More thorough but costs ~3x more API calls.",
+              desc: "Experts evaluate, cross-critique, and debate to reach consensus.",
+              detail: "More thorough · ~3x API calls",
             },
             {
               id: "aggregate",
               label: "Aggregate",
               icon: "📊",
-              desc: "Experts evaluate independently, then scores are statistically averaged and verdict determined by majority vote.",
-              detail: "Faster and cheaper. No debate transcript — disagreements are flagged but not resolved.",
+              desc: "Experts evaluate independently, scores are averaged by majority vote.",
+              detail: "Faster and cheaper · No debate",
             },
           ].map((method) => (
             <div
               key={method.id}
               onClick={() => setOrchestrationMethod(method.id)}
               style={{
-                padding: 18,
+                padding: 16,
                 borderRadius: 12,
                 border: `2px solid ${orchestrationMethod === method.id ? theme.violet : theme.borderSubtle}`,
                 background: orchestrationMethod === method.id ? theme.violetPale + "55" : theme.surface,
@@ -705,16 +702,14 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
               onMouseEnter={(e) => { if (orchestrationMethod !== method.id) e.currentTarget.style.borderColor = theme.violet + "44"; }}
               onMouseLeave={(e) => { if (orchestrationMethod !== method.id) e.currentTarget.style.borderColor = theme.borderSubtle; }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <span style={{ fontSize: 20 }}>{method.icon}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: theme.text }}>{method.label}</span>
-                  {orchestrationMethod === method.id && (
-                    <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: theme.violet, color: "#fff" }}>Selected</span>
-                  )}
-                </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                <span style={{ fontSize: 18 }}>{method.icon}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: theme.text }}>{method.label}</span>
+                {orchestrationMethod === method.id && (
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: theme.violet, color: "#fff" }}>Selected</span>
+                )}
               </div>
-              <p style={{ fontSize: 13, color: theme.textSec, margin: "0 0 6px", lineHeight: 1.5 }}>{method.desc}</p>
+              <p style={{ fontSize: 13, color: theme.textSec, margin: "0 0 2px", lineHeight: 1.4 }}>{method.desc}</p>
               <p style={{ fontSize: 11, color: theme.textTer, margin: 0 }}>{method.detail}</p>
             </div>
           ))}

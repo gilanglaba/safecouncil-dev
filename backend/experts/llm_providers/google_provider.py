@@ -15,12 +15,8 @@ class GoogleProvider(LLMProvider):
     def __init__(self, model: str, api_key: str, **kwargs):
         super().__init__(model=model, api_key=api_key)
         genai.configure(api_key=api_key)
-        self.generation_config = GenerationConfig(
-            response_mime_type="application/json",
-            max_output_tokens=4096,
-        )
 
-    def call(self, system_prompt: str, user_message: str, max_tokens: int = 4096) -> LLMResponse:
+    def call(self, system_prompt: str, user_message: str, max_tokens: int = 8192) -> LLMResponse:
         start = time.time()
         try:
             config = GenerationConfig(

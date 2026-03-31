@@ -18,7 +18,7 @@ class Config:
     # Models
     CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 
     # Paths
     LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")

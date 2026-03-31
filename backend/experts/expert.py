@@ -37,6 +37,7 @@ class Expert(BaseExpert):
         super().__init__(name=name, llm_provider=provider.provider_name, api_key="")
         self.provider = provider
         self.dimensions = dimensions  # If None, will be loaded at eval time
+        self.is_local = provider.provider_name == "local"
 
     def _call_llm(self, system_prompt: str, user_message: str) -> str:
         """Delegate to the provider."""
@@ -61,10 +62,11 @@ class Expert(BaseExpert):
 
     def evaluate(self, eval_input: "EvaluationInput", governance_context: str) -> ExpertAssessment:
         """Run full evaluation using dimensions from YAML."""
-        logger.info(f"[{self.name}] Starting evaluation of '{eval_input.agent_name}'")
+        logger.info(f"[{self.name}] Starting evaluation of '{eval_input.agent_name}'"
+                     + (" (compact prompt for local LLM)" if self.is_local else ""))
 
         system_prompt, user_message = build_evaluation_prompt(
-            eval_input, governance_context, self.dimensions
+            eval_input, governance_context, self.dimensions, compact=self.is_local
         )
 
         raw_response, data = self._call_with_retry(system_prompt, user_message, self._parse_evaluation_response)

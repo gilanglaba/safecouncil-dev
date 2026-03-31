@@ -196,6 +196,7 @@ class AggregateOrchestrator(BaseOrchestrator):
                 "total_api_calls": api_calls,
                 "total_input_tokens": input_tokens,
                 "total_output_tokens": output_tokens,
+                "total_tokens_used": input_tokens + output_tokens,
                 "evaluation_time_seconds": elapsed,
                 "total_cost_usd": self._estimate_cost(assessments),
             },

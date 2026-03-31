@@ -269,11 +269,16 @@ def list_evaluations():
                     with open(log_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     verdict_data = data.get("verdict", {})
+                    assessments = data.get("expert_assessments", [])
+                    scores = [a.get("overall_score", 0) for a in assessments if isinstance(a, dict)]
+                    avg_score = round(sum(scores) / len(scores)) if scores else 0
                     evaluations.append({
                         "eval_id": data.get("eval_id", eval_id),
                         "agent_name": data.get("agent_name", "Unknown"),
                         "verdict": verdict_data.get("final_verdict", "UNKNOWN"),
                         "confidence": verdict_data.get("confidence", 0),
+                        "overall_score": avg_score,
+                        "orchestrator_method": data.get("orchestrator_method", ""),
                         "timestamp": data.get("timestamp", ""),
                     })
                 except (json.JSONDecodeError, KeyError) as e:

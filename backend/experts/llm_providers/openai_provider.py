@@ -19,11 +19,24 @@ class OpenAIProvider(LLMProvider):
         client_kwargs = {"api_key": api_key}
         if endpoint:
             client_kwargs["base_url"] = endpoint
+        # Local LLMs are slow — use longer timeout and no retries
+        is_local = bool(endpoint) and ("localhost" in endpoint or "127.0.0.1" in endpoint)
+        if is_local:
+            client_kwargs["timeout"] = 600.0  # 10 minutes
+            client_kwargs["max_retries"] = 0
         self.client = OpenAI(**client_kwargs)
+
+    @property
+    def is_local(self) -> bool:
+        return bool(self.endpoint) and ("localhost" in self.endpoint or "127.0.0.1" in self.endpoint)
 
     def call(self, system_prompt: str, user_message: str, max_tokens: int = 4096) -> LLMResponse:
         start = time.time()
         try:
+            # Local LLMs have limited context — cap max_tokens to leave room for output
+            if self.is_local:
+                max_tokens = min(max_tokens, 2048)
+
             kwargs = {
                 "model": self.model,
                 "max_tokens": max_tokens,
@@ -33,7 +46,7 @@ class OpenAIProvider(LLMProvider):
                 ],
             }
             # Only use json_object format for OpenAI API — local LLMs may not support it
-            if not self.endpoint or "localhost" not in self.endpoint and "127.0.0.1" not in self.endpoint:
+            if not self.is_local:
                 kwargs["response_format"] = {"type": "json_object"}
 
             response = self.client.chat.completions.create(**kwargs)
@@ -56,6 +69,6 @@ class OpenAIProvider(LLMProvider):
 
     @property
     def provider_name(self) -> str:
-        if self.endpoint and "localhost" in self.endpoint:
+        if self.is_local:
             return "local"
         return "openai"

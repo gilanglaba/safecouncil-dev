@@ -109,11 +109,16 @@ class EvaluationService:
             if job.status == EvalStatus.COMPLETE and job.result:
                 r = job.result
                 if isinstance(r, dict):
+                    assessments = r.get("expert_assessments", [])
+                    scores = [a.get("overall_score", 0) for a in assessments if isinstance(a, dict)]
+                    avg_score = round(sum(scores) / len(scores)) if scores else 0
                     result.append({
                         "eval_id": r.get("eval_id", ""),
                         "agent_name": r.get("agent_name", ""),
                         "verdict": r.get("verdict", {}).get("final_verdict", "UNKNOWN"),
                         "confidence": r.get("verdict", {}).get("confidence", 0),
+                        "overall_score": avg_score,
+                        "orchestrator_method": r.get("orchestrator_method", ""),
                         "timestamp": r.get("timestamp", ""),
                     })
                 else:
@@ -122,6 +127,8 @@ class EvaluationService:
                         "agent_name": r.agent_name,
                         "verdict": r.final_verdict.value,
                         "confidence": r.confidence,
+                        "overall_score": 0,
+                        "orchestrator_method": "",
                         "timestamp": r.timestamp,
                     })
         return sorted(result, key=lambda x: x["timestamp"], reverse=True)

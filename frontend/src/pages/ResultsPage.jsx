@@ -91,30 +91,27 @@ function ExpertCard({ assessment }) {
           {assessment.expert_name}
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 12 }}>
-          <div style={{ fontSize: 40, fontWeight: 800, fontFamily: theme.fontMono, color: scoreColor, lineHeight: 1 }}>
-            {assessment.overall_score}
-          </div>
+          {/* Show initial → final if score changed */}
+          {assessment.initial_overall_score != null && assessment.initial_overall_score !== assessment.overall_score ? (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <span style={{ fontSize: 24, fontWeight: 600, fontFamily: theme.fontMono, color: theme.textTer, opacity: 0.5 }}>
+                {assessment.initial_overall_score}
+              </span>
+              <span style={{ fontSize: 16, color: theme.textTer }}>→</span>
+              <span style={{ fontSize: 40, fontWeight: 800, fontFamily: theme.fontMono, color: scoreColor, lineHeight: 1 }}>
+                {assessment.overall_score}
+              </span>
+            </div>
+          ) : (
+            <div style={{ fontSize: 40, fontWeight: 800, fontFamily: theme.fontMono, color: scoreColor, lineHeight: 1 }}>
+              {assessment.overall_score}
+            </div>
+          )}
           <div style={{ marginBottom: 4 }}>
             <div style={{ fontSize: 13, color: theme.textTer }}>/100</div>
             <VerdictBadge verdict={assessment.verdict} size="sm" />
           </div>
-          {/* Score evolution for deliberative results */}
-          {assessment.initial_overall_score != null && assessment.initial_overall_score !== assessment.overall_score && (
-            <div style={{ fontSize: 12, color: theme.textTer, marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontFamily: theme.fontMono, textDecoration: "line-through", opacity: 0.5 }}>{assessment.initial_overall_score}</span>
-              <span>→</span>
-              <span style={{ fontFamily: theme.fontMono, fontWeight: 700, color: assessment.overall_score > assessment.initial_overall_score ? theme.green : theme.red }}>
-                {assessment.overall_score > assessment.initial_overall_score ? "+" : ""}{assessment.overall_score - assessment.initial_overall_score}
-              </span>
-            </div>
-          )}
         </div>
-        {/* Revision rationale */}
-        {assessment.revision_rationale && (
-          <div style={{ fontSize: 11, color: theme.textTer, fontStyle: "italic", marginBottom: 8, lineHeight: 1.4 }}>
-            {assessment.revision_rationale}
-          </div>
-        )}
 
         {/* Category scores — color-coded number only */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -202,11 +199,35 @@ function OverviewTab({ result }) {
       </div>
 
       {/* Expert cards */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 28 }}>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
         {(result.expert_assessments || []).map((a) => (
           <ExpertCard key={a.expert_name} assessment={a} />
         ))}
       </div>
+
+      {/* Revision rationales — deliberative only, shown below cards */}
+      {(() => {
+        const rationales = (result.expert_assessments || []).filter(a => a.revision_rationale);
+        if (rationales.length === 0) return null;
+        return (
+          <div style={{
+            background: theme.violetPale + "55", border: `1px solid ${theme.violetBorder}`,
+            borderRadius: theme.radiusMd, padding: "16px 20px", marginBottom: 20,
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: theme.violet, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+              Score Revision Rationale
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {rationales.map((a) => (
+                <div key={a.expert_name} style={{ fontSize: 13, color: theme.text, lineHeight: 1.5 }}>
+                  <span style={{ fontWeight: 600 }}>{a.expert_name}:</span>{" "}
+                  <span style={{ fontStyle: "italic", color: theme.textSec }}>{a.revision_rationale}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {result.agreements?.length > 0 && (
@@ -1076,9 +1097,19 @@ function ResultsView({ result, onDownloadPDF }) {
         {/* Right: agent info + download */}
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: theme.textSec }}>{result.agent_name}</div>
-          <div style={{ fontSize: 11, color: theme.textTer }}>
-            {result.audit ? `${result.audit.total_api_calls} calls · ${result.audit.evaluation_time_seconds ? result.audit.evaluation_time_seconds.toFixed(0) + "s" : "—"}` : ""}
-          </div>
+          {result.audit && (
+            <div style={{ fontSize: 11, color: theme.textTer, lineHeight: 1.6 }}>
+              {result.audit.total_tokens_used ? `${result.audit.total_tokens_used.toLocaleString()} tokens` : ""}
+              {result.audit.total_tokens_used && result.audit.total_api_calls ? " · " : ""}
+              {result.audit.total_api_calls ? `${result.audit.total_api_calls} calls` : ""}
+              {result.audit.evaluation_time_seconds ? (
+                <span> · {result.audit.evaluation_time_seconds >= 60
+                  ? `${Math.floor(result.audit.evaluation_time_seconds / 60)}m ${Math.round(result.audit.evaluation_time_seconds % 60)}s`
+                  : `${Math.round(result.audit.evaluation_time_seconds)}s`
+                }</span>
+              ) : ""}
+            </div>
+          )}
           <button
             onClick={onDownloadPDF}
             style={{
