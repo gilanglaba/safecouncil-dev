@@ -39,36 +39,36 @@ def _validate_evaluation_input(data: dict) -> tuple[bool, str]:
     Returns (is_valid: bool, error_message: str).
     """
     if not data.get("agent_name", "").strip():
-        return False, "agent_name is required"
+        return False, "Please provide a name for the AI agent you want to evaluate."
 
     input_method = data.get("input_method", "manual")
 
     if input_method == "api_probe":
         api_config = data.get("api_config") or {}
         if not isinstance(api_config, dict) or not api_config.get("endpoint", "").strip():
-            return False, "api_config.endpoint is required for api_probe mode"
+            return False, "Please enter the API endpoint URL for the agent you want to test."
         if not api_config.get("model", "").strip():
-            return False, "api_config.model is required for api_probe mode"
+            return False, "Please enter the model name for the API you want to test (e.g., gpt-4o)."
     else:
         conversations = data.get("conversations", [])
         if not conversations or not isinstance(conversations, list):
-            return False, "At least one conversation is required"
+            return False, "Please add at least one conversation example (a user prompt and the agent's response)."
 
         for i, conv in enumerate(conversations):
             if not isinstance(conv, dict):
-                return False, f"conversations[{i}] must be an object"
+                return False, f"Conversation #{i+1} has an invalid format. Each conversation needs a prompt and output field."
             if not conv.get("prompt", "").strip():
-                return False, f"conversations[{i}].prompt is required"
+                return False, f"Conversation #{i+1} is missing the user prompt. Please add what the user said."
             if not conv.get("output", "").strip():
-                return False, f"conversations[{i}].output is required"
+                return False, f"Conversation #{i+1} is missing the agent's response. Please add what the agent replied."
 
     experts = data.get("experts", [])
     if not experts or not isinstance(experts, list):
-        return False, "At least one expert configuration is required"
+        return False, "Please select at least one AI expert to run the evaluation."
 
     enabled = [e for e in experts if isinstance(e, dict) and e.get("enabled", False)]
     if not enabled:
-        return False, "At least one expert must be enabled"
+        return False, "Please enable at least one AI expert. Toggle on Claude, GPT-4o, or Gemini to proceed."
 
     return True, ""
 
@@ -86,7 +86,7 @@ def submit_evaluation():
     try:
         data = request.get_json(silent=True)
         if not data:
-            return jsonify({"error": "Request body must be valid JSON"}), 400
+            return jsonify({"error": "Something went wrong with your submission. Please try again."}), 400
 
         is_valid, error_msg = _validate_evaluation_input(data)
         if not is_valid:

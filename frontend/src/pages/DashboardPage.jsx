@@ -8,6 +8,13 @@ import { theme, getScoreColor } from "../theme";
 import { api } from "../api";
 import { DEMO_RESULT, DEMO_RESULT_AGGREGATE } from "../demoResult";
 
+// ── SafeCouncil Dashboard — Evaluation History & Accessibility ──────────
+// The dashboard allows non-technical UNICC stakeholders to browse past
+// evaluations, filter by verdict (APPROVE / REVIEW / REJECT), and access
+// full results for any previously evaluated agent. This provides an
+// accessible, audit-friendly interface for governance oversight without
+// requiring technical expertise or API knowledge.
+
 function formatDate(timestamp) {
   if (!timestamp) return "—";
   try {

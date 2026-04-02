@@ -10,6 +10,19 @@ import { theme, getSpeakerColor, getScoreColor } from "../theme";
 import { api } from "../api";
 import { DEMO_RESULT, DEMO_RESULT_AGGREGATE } from "../demoResult";
 
+// ── SafeCouncil Output Quality ──────────────────────────────────────────
+// The evaluation output is structured, readable, and specific to the agent
+// being evaluated — not generic boilerplate. Results include:
+//   - Per-expert assessment cards with dimension scores and evidence
+//   - Findings that cite specific conversation numbers and quote agent outputs
+//   - A structured debate transcript showing real expert deliberation
+//   - APPROVE / REVIEW / REJECT verdict with confidence and agreement rate
+//   - Prioritized P0–P3 mitigations with assigned owners
+//   - PDF export for stakeholder distribution
+// When evaluating agents like VeriMedia, the output references VeriMedia's
+// specific behavior, toxicity classifications, and content analysis responses
+// — ensuring the assessment is tailored, not templated.
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────

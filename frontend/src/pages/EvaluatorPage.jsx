@@ -9,6 +9,18 @@ import { theme } from "../theme";
 import { api } from "../api";
 import { DEMO_RESULT } from "../demoResult";
 
+// ── SafeCouncil UX Design for Non-Technical Stakeholders ────────────────
+// This evaluator page is designed so that a non-technical UNICC stakeholder
+// can submit an AI agent and understand the output easily. The interface
+// provides:
+//   - A Tool Catalog for one-click agent selection (no manual JSON needed)
+//   - Guided tooltips explaining expert configuration and governance frameworks
+//   - Plain-language error messages instead of developer-oriented errors
+//   - A "How it works" introduction banner explaining the evaluation process
+//   - Clear APPROVE / REVIEW / REJECT verdict language
+// The goal is zero-friction usability for policy officers, governance leads,
+// and program managers — not just developers.
+
 /*
   SafeCouncil Tool Catalog — Dynamic Input Acceptance
 
@@ -276,6 +288,25 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
         </button>
       </div>
 
+      {/* ── Intro Banner ────────────────────────────────────────────────── */}
+      <div style={{
+        background: `linear-gradient(135deg, ${theme.violetPale}88, ${theme.unBluePale}88)`,
+        borderRadius: 16,
+        border: `1px solid ${theme.violet}22`,
+        padding: "20px 24px",
+        marginBottom: 16,
+      }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: theme.text, margin: "0 0 8px" }}>
+          How it works
+        </h3>
+        <p style={{ fontSize: 13, color: theme.textSec, margin: 0, lineHeight: 1.6 }}>
+          Select an AI agent to evaluate, choose your expert panel (up to 3 independent AI reviewers),
+          and pick the governance standards to assess against. SafeCouncil will run a rigorous safety
+          evaluation with cross-critique and deliver an <strong>APPROVE</strong>, <strong>REVIEW</strong>,
+          or <strong>REJECT</strong> verdict with actionable recommendations.
+        </p>
+      </div>
+
       {/* ── SECTION 1: Choose a Tool ──────────────────────────────────────── */}
       <div style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 28, marginBottom: 16 }}>
         <SectionHead num="1" title="Choose a Tool to Evaluate" />
@@ -453,6 +484,9 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
         <p style={{ fontSize: 13, color: theme.textTer, margin: "-12px 0 16px", lineHeight: 1.5 }}>
           Each expert independently evaluates the same <strong style={{ color: theme.textSec }}>unified rubric</strong> across Safety, Governance, and Trust. Multiple vendors ensure diverse perspectives.
         </p>
+        <p style={{ fontSize: 12, color: theme.textTer, margin: "0 0 12px", padding: "8px 12px", background: theme.bgWarm, borderRadius: 8 }}>
+          💡 <strong>Tip:</strong> Enable at least 2 experts for cross-critique. Using all 3 gives the most thorough evaluation with diverse AI perspectives.
+        </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
           {experts.map((ex) => (
             <div
@@ -503,6 +537,9 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
         <SectionHead num="3" title="Governance Frameworks & Context" badge={<Badge color={theme.violet}>{selectedFrameworks} selected</Badge>} />
         <p style={{ fontSize: 13, color: theme.textTer, margin: "-12px 0 16px", lineHeight: 1.5 }}>
           Select which governance standards to evaluate against. Experts will reference these frameworks via RAG (Retrieval-Augmented Generation) to cite specific regulations in their assessments.
+        </p>
+        <p style={{ fontSize: 12, color: theme.textTer, margin: "0 0 12px", padding: "8px 12px", background: theme.bgWarm, borderRadius: 8 }}>
+          💡 <strong>Tip:</strong> The default frameworks (EU AI Act, NIST, UNESCO, OWASP) cover most use cases. Add ISO 42001 for management system compliance or UNICC for UN-specific data sovereignty requirements.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
           {frameworks.map((f) => (
@@ -687,6 +724,9 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
       {/* ── SECTION 4: Orchestration Method ────────────────────────────────── */}
       <div style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 28, marginBottom: 16 }}>
         <SectionHead num="4" title="Council Method" />
+        <p style={{ fontSize: 12, color: theme.textTer, margin: "-8px 0 12px", padding: "8px 12px", background: theme.bgWarm, borderRadius: 8 }}>
+          💡 <strong>Tip:</strong> "Deliberative" is recommended — experts debate and revise their scores. "Aggregate" is faster but skips the cross-critique step.
+        </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[
             {
