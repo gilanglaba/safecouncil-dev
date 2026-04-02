@@ -1,0 +1,38 @@
+.PHONY: setup run install-frontend run-frontend test clean
+
+VENV := .venv
+PYTHON := $(VENV)/bin/python
+PIP := $(VENV)/bin/pip
+
+# Default target
+run: $(VENV)
+	$(PYTHON) -c "import dotenv" 2>/dev/null || $(PIP) install -r backend/requirements.txt
+	cd backend && ../$(PYTHON) app.py
+
+setup: $(VENV)
+	$(PIP) install -r backend/requirements.txt
+	@if [ ! -f backend/.env ]; then \
+		cp backend/.env.example backend/.env; \
+		echo ""; \
+		echo ">>> Created backend/.env from .env.example"; \
+		echo ">>> Edit backend/.env and add your API keys before running."; \
+	else \
+		echo ">>> backend/.env already exists — skipping copy."; \
+	fi
+
+$(VENV):
+	python3 -m venv $(VENV)
+
+install-frontend:
+	cd frontend && npm install
+
+run-frontend:
+	cd frontend && npm run dev
+
+test: $(VENV)
+	cd backend && ../$(PYTHON) -m pytest ../tests/ -v
+
+clean:
+	rm -rf $(VENV) __pycache__ backend/__pycache__ .pytest_cache
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true

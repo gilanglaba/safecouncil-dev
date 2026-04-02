@@ -17,7 +17,7 @@ const TEAM = [
     role: "AI Systems Engineer",
     color: theme.unBlueDark,
     photo: "/jimmy.jpg",
-    desc: "Architects SafeCouncil's modular platform, from provider-agnostic infrastructure to local LLM deployment and governance operationalization.",
+    desc: "Builds SafeCouncil's modular platform infrastructure, local LLM deployment, and governance operationalization.",
   },
   {
     initials: "IZ",

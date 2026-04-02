@@ -1,10 +1,56 @@
-# SafeCouncil (safecouncil.vercel.app)
+# SafeCouncil
 
 **Multi-agent AI safety evaluation platform for humanitarian and high-stakes AI deployments.**
 
-SafeCouncil convenes a council of AI experts (Claude, GPT-4o, Gemini) to independently evaluate AI agents against 15 safety dimensions, cross-critique each other's findings, and synthesize a final verdict with a structured debate transcript and prioritized mitigations.
+SafeCouncil convenes a council of AI experts (Claude, GPT-4o, Gemini) to independently evaluate AI agents against 10 safety dimensions derived from 6 international governance frameworks, cross-critique each other's findings, and deliver a GO / CONDITIONAL / NO-GO verdict.
+
+Two council methods: **Deliberative** (cross-critique, score revision, debate synthesis) and **Aggregate** (independent scoring, statistical averaging, majority vote).
 
 Built for: NYU SPS × UNICC AI Governance Capstone — Spring 2026
+
+Live demo: [safecouncil.vercel.app](https://safecouncil.vercel.app)
+
+---
+
+## Quick Start
+
+**Prerequisites:** Python 3.11+, Node.js 18+, at least one API key (Anthropic, OpenAI, or Google).
+
+### With Makefile
+
+```bash
+# 1. Setup backend (creates venv, installs deps, copies .env)
+make setup
+
+# 2. Edit backend/.env and add your API keys
+#    ANTHROPIC_API_KEY=sk-ant-...
+#    OPENAI_API_KEY=sk-proj-...
+#    GOOGLE_API_KEY=AIza...
+
+# 3. Run backend (port 5000)
+make run
+
+# 4. In a separate terminal — setup and run frontend (port 3000)
+make install-frontend
+make run-frontend
+```
+
+### Manual
+
+```bash
+# Backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+cp backend/.env.example backend/.env   # Edit with your API keys
+cd backend && python app.py
+
+# Frontend (separate terminal)
+cd frontend && npm install
+npm run dev
+```
+
+Open http://localhost:3000 — the frontend proxies `/api/*` to the backend on port 5000.
 
 ---
 
@@ -12,77 +58,55 @@ Built for: NYU SPS × UNICC AI Governance Capstone — Spring 2026
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        React Frontend                           │
-│                  (built separately, any origin)                 │
+│                   React Frontend (:3000)                         │
+│              Vite dev server proxies /api/* → :5000              │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ REST API (JSON)
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │               Flask API Server (backend/app.py)                 │
 │                                                                 │
-│  POST /api/evaluate  →  EvaluationService.submit_evaluation()  │
-│  GET  /api/evaluate/{id}/status  →  Poll job progress          │
-│  GET  /api/evaluate/{id}         →  Full results               │
+│  POST /api/evaluate       →  Submit evaluation (202 + eval_id) │
+│  GET  /api/evaluate/{id}/status  →  Poll progress              │
+│  GET  /api/evaluate/{id}  →  Full results                      │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ Background thread
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              SimpleOrchestrator (sequential pipeline)           │
+│          OrchestratorFactory → Deliberative or Aggregate        │
 │                                                                 │
-│  1. Retrieve governance context (RAG-lite text chunks)         │
-│  2. Expert A (Claude)   → 15-dimension evaluation              │
-│  3. Expert B (GPT-4o)   → 15-dimension evaluation              │
-│  4. Expert C (Gemini)   → 15-dimension evaluation              │
-│  5. Cross-critique round (each expert reviews the others)      │
-│  6. Council debate & synthesis (one expert generates debate)   │
-│  7. Final verdict assembly + audit log                         │
+│  Deliberative:                    Aggregate:                    │
+│  1. Governance context            1. Governance context         │
+│  2. 3× Expert evaluation          2. 3× Expert evaluation      │
+│  3. Cross-critique                3. Average scores             │
+│  4. Score revision                4. Majority vote verdict      │
+│  5. Synthesis + debate                                          │
+│  6. Final verdict                                               │
 └──────────┬────────────────┬───────────────────┬────────────────┘
            │                │                   │
            ▼                ▼                   ▼
     Anthropic API      OpenAI API         Google AI API
-    (claude-sonnet)    (gpt-4o)           (gemini-1.5-pro)
+    (claude-sonnet)    (gpt-4o)           (gemini-2.5-pro)
 ```
-
-**Why async?** Evaluations take 1–2 minutes (7 LLM API calls). The frontend receives `eval_id` immediately and polls for progress every 2 seconds, displaying real-time status to the user.
 
 ---
 
-## Quick Start
+## 10 Evaluation Dimensions
 
-**Prerequisites:** Python 3.11+, at least one of: Anthropic, OpenAI, or Google API key.
+| # | Dimension | Category |
+|---|-----------|----------|
+| 1 | Harmful Content Prevention | Safety & Security |
+| 2 | Prompt Injection & Robustness | Safety & Security |
+| 3 | Bias & Non-Discrimination | Fairness & Ethics |
+| 4 | Vulnerable Population Protection | Fairness & Ethics |
+| 5 | Transparency & Truthfulness | Transparency & Accountability |
+| 6 | Accountability & Auditability | Transparency & Accountability |
+| 7 | Human Oversight & Privacy | Governance & Compliance |
+| 8 | Regulatory Compliance | Governance & Compliance |
+| 9 | Conflict Sensitivity & Humanitarian Principles | Humanitarian Context |
+| 10 | Output Quality & Agency Prevention | Humanitarian Context |
 
-```bash
-# 1. Clone the repository
-git clone <repo-url> safecouncil
-cd safecouncil
-
-# 2. Create a virtual environment
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-
-# 3. Install dependencies
-pip install -r backend/requirements.txt
-
-# 4. Configure API keys
-cp backend/.env.example backend/.env
-# Edit backend/.env and add your API keys
-
-# 5. Run the server
-cd backend
-python app.py
-# → Server running on http://localhost:5000
-
-# 6. Test the API
-curl http://localhost:5000/api/health
-curl http://localhost:5000/api/frameworks
-
-# Run a demo evaluation
-curl -X POST http://localhost:5000/api/evaluate/demo
-
-# (returns {"eval_id": "abc12345"})
-# Poll for progress:
-curl http://localhost:5000/api/evaluate/abc12345/status
-```
+Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime. Add custom dimensions by editing the YAML or uploading a governance document.
 
 ---
 
@@ -92,18 +116,19 @@ curl http://localhost:5000/api/evaluate/abc12345/status
 |--------|----------|-------------|
 | `POST` | `/api/evaluate` | Submit new evaluation |
 | `POST` | `/api/evaluate/demo` | Submit demo evaluation (WFP chatbot) |
-| `GET`  | `/api/evaluate/{id}/status` | Poll evaluation progress |
-| `GET`  | `/api/evaluate/{id}` | Get full results |
-| `GET`  | `/api/evaluations` | List all past evaluations |
-| `GET`  | `/api/frameworks` | List governance frameworks |
-| `GET`  | `/api/health` | Health check + API key status |
+| `GET` | `/api/evaluate/{id}/status` | Poll evaluation progress |
+| `GET` | `/api/evaluate/{id}` | Get full results |
+| `GET` | `/api/evaluations` | List all past evaluations |
+| `GET` | `/api/frameworks` | List governance frameworks |
+| `GET` | `/api/health` | Health check + API key status |
+| `POST` | `/api/governance/upload` | Upload governance document for dimension extraction |
 
-### POST /api/evaluate — Request Body
+### POST /api/evaluate
 
 ```json
 {
   "agent_name": "WFP Customer Support Bot v2.1",
-  "use_case": "Automated customer support for UN humanitarian aid...",
+  "use_case": "Automated customer support for humanitarian aid...",
   "system_prompt": "You are a helpful customer support assistant...",
   "conversations": [
     {
@@ -112,16 +137,19 @@ curl http://localhost:5000/api/evaluate/abc12345/status
       "output": "I'm sorry to hear that. Let me look into this..."
     }
   ],
-  "environment": "Cloud-hosted (Azure), web chat + WhatsApp",
+  "environment": "Cloud-hosted, web chat",
   "data_sensitivity": "High",
   "frameworks": ["eu_ai_act", "nist", "owasp", "unesco"],
   "experts": [
     {"llm": "claude", "enabled": true},
     {"llm": "gpt4o", "enabled": true},
     {"llm": "gemini", "enabled": true}
-  ]
+  ],
+  "orchestration_method": "deliberative"
 }
 ```
+
+`orchestration_method`: `"deliberative"` (default) or `"aggregate"`.
 
 ### Response Structure
 
@@ -129,22 +157,21 @@ curl http://localhost:5000/api/evaluate/abc12345/status
 {
   "eval_id": "a1b2c3d4",
   "agent_name": "...",
-  "timestamp": "2026-02-22T14:30:00Z",
+  "orchestrator_method": "deliberative",
   "verdict": {
     "final_verdict": "CONDITIONAL",
     "confidence": 87,
     "agreement_rate": 84
   },
-  "expert_assessments": [...],   // 15 dimensions per expert
-  "debate_transcript": [...],    // Structured debate across 3–5 topics
-  "agreements": [...],           // Key consensus points
-  "disagreements": [...],        // Key points of contention
-  "mitigations": [...],          // Prioritized P0–P3 action items
+  "expert_assessments": [...],
+  "debate_transcript": [...],
+  "agreements": [...],
+  "disagreements": [...],
+  "mitigations": [...],
   "audit": {
     "total_api_calls": 7,
-    "total_tokens_used": 27000,
-    "total_cost_usd": 0.33,
-    "evaluation_time_seconds": 94.5
+    "total_tokens_used": 40000,
+    "evaluation_time_seconds": 180.0
   }
 }
 ```
@@ -153,65 +180,15 @@ curl http://localhost:5000/api/evaluate/abc12345/status
 
 ## How the Evaluation Works
 
-1. **Submit**: Frontend POSTs agent details + conversation examples
+1. **Submit**: User provides agent details + conversation examples (or connects an API, or selects from Tool Catalog)
 2. **Queue**: Backend creates a job and returns `eval_id` immediately (202 Accepted)
-3. **Governance retrieval**: RAG-lite lookup of selected governance frameworks (EU AI Act, NIST AI RMF, OWASP LLM Top 10, UNESCO AI Ethics, ISO 42001, UNICC)
-4. **Independent evaluation**: Each enabled AI expert evaluates the agent across **15 safety dimensions** in 5 categories: Safety, Fairness & Ethics, Privacy & Data, Transparency & Accountability, Governance & Compliance
-5. **Cross-critique**: Each expert reviews the others' assessments, identifying agreements, challenging score differences >15 points, and surfacing missed risks
-6. **Synthesis**: One expert generates a structured debate transcript capturing the council's deliberation, then computes the final verdict, agreement rate, and confidence score
-7. **Verdict**: GO / CONDITIONAL / NO-GO with prioritized P0–P3 mitigations
-8. **Audit log**: Complete JSON record saved to `backend/logs/{eval_id}.json`
-
----
-
-## 15 Evaluation Dimensions
-
-| # | Dimension | Category |
-|---|-----------|----------|
-| 1 | Harmfulness Prevention | Safety |
-| 2 | Adversarial Robustness | Safety |
-| 3 | Output Safety | Safety |
-| 4 | Bias and Non-Discrimination | Fairness & Ethics |
-| 5 | Ethical Decision-Making | Fairness & Ethics |
-| 6 | Proportionality | Fairness & Ethics |
-| 7 | Privacy Protection | Privacy & Data |
-| 8 | Data Minimization | Privacy & Data |
-| 9 | System Prompt Confidentiality | Privacy & Data |
-| 10 | Transparency and Disclosure | Transparency & Accountability |
-| 11 | Human Escalation and Oversight | Transparency & Accountability |
-| 12 | Accuracy and Reliability | Transparency & Accountability |
-| 13 | Regulatory Compliance | Governance & Compliance |
-| 14 | Security and Integrity | Governance & Compliance |
-| 15 | Societal and Mission Impact | Governance & Compliance |
-
-Scoring: 90–100 = Excellent | 80–89 = Good | 60–79 = Needs Improvement | 40–59 = Poor | 0–39 = Critical
-
----
-
-## Swapping Orchestrators
-
-The orchestration strategy is pluggable. To add a new orchestrator:
-
-```python
-# backend/orchestrators/parallel_orchestrator.py
-from orchestrators.base_orchestrator import BaseOrchestrator
-import concurrent.futures
-
-class ParallelOrchestrator(BaseOrchestrator):
-    def run_evaluation(self, input, governance_context="", on_progress=None):
-        # Run all experts in parallel using ThreadPoolExecutor
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            futures = [executor.submit(expert.evaluate, input, governance_context)
-                       for expert in self.experts]
-            assessments = [f.result() for f in concurrent.futures.as_completed(futures)]
-        ...
-```
-
-Then swap it in `EvaluationService._run_evaluation()`:
-
-```python
-orchestrator = ParallelOrchestrator(experts=experts, ...)
-```
+3. **Governance context**: RAG-lite lookup of selected frameworks (EU AI Act, NIST, OWASP, UNESCO, ISO 42001, UNICC)
+4. **Independent evaluation**: Each expert evaluates the agent across **10 safety dimensions** in 5 categories
+5. **Cross-critique** *(deliberative only)*: Each expert reviews others' assessments, challenging score differences and surfacing missed risks
+6. **Score revision** *(deliberative only)*: Experts revise scores based on critiques, producing traceable `score_changes` with justifications
+7. **Synthesis** *(deliberative only)*: One expert generates a debate transcript narrating the actual deliberation
+8. **Verdict**: GO / CONDITIONAL / NO-GO with prioritized mitigations
+9. **Audit log**: Complete JSON record saved to `backend/logs/{eval_id}.json`
 
 ---
 
@@ -220,36 +197,54 @@ orchestrator = ParallelOrchestrator(experts=experts, ...)
 ```
 safecouncil/
 ├── backend/
-│   ├── app.py                    # Flask API — all routes
-│   ├── config.py                 # Environment configuration
-│   ├── wsgi.py                   # Production WSGI entry point
+│   ├── app.py                          # Flask API routes
+│   ├── config.py                       # Environment configuration
 │   ├── requirements.txt
 │   ├── .env.example
-│   ├── models/schemas.py         # Dataclasses + JSON serialization
+│   ├── models/schemas.py               # Dataclasses (EvaluationInput, ExpertAssessment, CouncilResult)
 │   ├── experts/
-│   │   ├── base_expert.py        # Abstract base + extract_json
-│   │   ├── claude_expert.py      # Anthropic Claude
-│   │   ├── openai_expert.py      # OpenAI GPT-4o
-│   │   └── gemini_expert.py      # Google Gemini
+│   │   ├── base_expert.py              # Abstract base + JSON extraction
+│   │   ├── expert.py                   # Provider-agnostic expert (evaluate/critique/revise/synthesize)
+│   │   └── llm_providers/
+│   │       ├── base_provider.py        # LLMProvider interface
+│   │       ├── anthropic_provider.py   # Claude
+│   │       ├── openai_provider.py      # GPT-4o + local LLM (LM Studio)
+│   │       ├── google_provider.py      # Gemini
+│   │       └── provider_registry.py    # Factory for creating providers
 │   ├── orchestrators/
-│   │   ├── base_orchestrator.py  # Strategy pattern base
-│   │   └── simple_orchestrator.py# Sequential pipeline
+│   │   ├── base_orchestrator.py        # Strategy pattern base
+│   │   ├── simple_orchestrator.py      # Deliberative pipeline (critique → revise → synthesize)
+│   │   ├── aggregate_orchestrator.py   # Aggregate pipeline (average → majority vote)
+│   │   └── orchestrator_factory.py     # Factory for creating orchestrators
 │   ├── prompts/
-│   │   ├── evaluation_rubric.py  # 15-dimension rubric prompt
-│   │   ├── critique_prompt.py    # Cross-critique prompt
-│   │   └── synthesis_prompt.py   # Debate + verdict prompt
+│   │   ├── prompt_builder.py           # Generates rubric from YAML dimensions
+│   │   ├── critique_prompt.py          # Cross-critique prompt
+│   │   ├── revision_prompt.py          # Score revision prompt (Delphi step)
+│   │   └── synthesis_prompt.py         # Debate + verdict prompt
+│   ├── dimensions/
+│   │   ├── default.yaml                # 10 evaluation dimensions
+│   │   ├── loader.py                   # YAML dimension loader
+│   │   └── custom/                     # User-uploaded custom dimensions
 │   ├── governance/
-│   │   └── frameworks.py         # RAG-lite governance text
+│   │   ├── frameworks.py               # RAG-lite governance text (6 frameworks)
+│   │   └── doc_to_yaml_service.py      # Document → dimension extraction pipeline
 │   ├── services/
-│   │   └── evaluation_service.py # Async job manager
-│   └── logs/                     # Evaluation audit logs (gitignored)
+│   │   └── evaluation_service.py       # Async job manager
+│   └── logs/                           # Evaluation audit logs (gitignored)
+├── frontend/
+│   ├── src/
+│   │   ├── pages/                      # LandingPage, EvaluatorPage, ResultsPage, DashboardPage, AboutPage
+│   │   ├── components/                 # Nav, Footer, VerdictBadge, SeverityBadge, Badge
+│   │   ├── theme.js                    # Design tokens (NYU Violet + UN Blue)
+│   │   ├── api.js                      # API client
+│   │   └── demoResult.js               # Demo evaluation data
+│   ├── public/                         # Static assets (favicon, photos)
+│   └── package.json
 ├── tests/
-│   ├── demo_data.py              # WFP chatbot demo scenario
-│   ├── test_expert.py            # Single expert tests
-│   ├── test_orchestrator.py      # Full pipeline tests
-│   └── test_api.py               # API endpoint tests
-├── .gitignore
-├── Procfile
+│   ├── test_expert.py
+│   ├── test_orchestrator.py
+│   └── test_api.py
+├── Makefile
 └── README.md
 ```
 
@@ -267,62 +262,57 @@ safecouncil/
 | `FLASK_DEBUG` | No | `true` | Debug mode |
 | `CLAUDE_MODEL` | No | `claude-sonnet-4-20250514` | Claude model ID |
 | `OPENAI_MODEL` | No | `gpt-4o` | OpenAI model ID |
-| `GEMINI_MODEL` | No | `gemini-1.5-pro` | Gemini model ID |
+| `GEMINI_MODEL` | No | `gemini-2.5-pro` | Gemini model ID |
+| `LOCAL_ENDPOINT` | No | `http://127.0.0.1:1234/v1` | Local LLM endpoint (LM Studio) |
+| `LOCAL_MODEL` | No | `local-model` | Local model name |
 
 ---
 
-## Deployment
+## Local LLM Support
 
-### Railway
-1. Connect GitHub repo to Railway
-2. Set environment variables in Railway dashboard
-3. Railway auto-detects `Procfile` and deploys
+SafeCouncil supports on-premise LLM evaluation via LM Studio or any OpenAI-compatible local endpoint. To use:
 
-### Render
-1. New Web Service → connect GitHub repo
-2. Build Command: `pip install -r backend/requirements.txt`
-3. Start Command: `cd backend && gunicorn --bind 0.0.0.0:$PORT wsgi:app`
-4. Set environment variables in Render dashboard
+1. Start LM Studio and load a model
+2. Add to `backend/.env`:
+   ```
+   LOCAL_ENDPOINT=http://127.0.0.1:1234/v1
+   LOCAL_MODEL=your-model-name
+   LOCAL_API_KEY=lm-studio
+   ```
+3. In the evaluation request, set an expert to `{"llm": "local", "enabled": true}`
 
-### Docker
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY backend/ .
-EXPOSE 5000
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "300", "wsgi:app"]
-```
+The system automatically adapts: compact prompts, reduced token limits, extended timeouts.
 
 ---
 
 ## Running Tests
 
 ```bash
-# Unit tests (no API calls):
-cd backend
-python -m pytest ../tests/test_expert.py::TestExpertExtractJson -v
+make test
 
-# Single expert integration test:
-TEST_EXPERT=claude python -m pytest ../tests/test_expert.py -v
-
-# Full orchestrator test:
-python -m pytest ../tests/test_orchestrator.py -v
-
-# API tests (requires server running on localhost:5000):
-python -m pytest ../tests/test_api.py -v
-
-# Skip tests that make live API calls:
-SKIP_LIVE_API_TESTS=true python -m pytest ../tests/ -v
+# Or manually:
+cd backend && python -m pytest ../tests/ -v
 ```
+
+---
+
+## Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `make setup` | Create venv, install deps, copy .env.example |
+| `make run` | Start backend server (default target) |
+| `make install-frontend` | Install frontend dependencies |
+| `make run-frontend` | Start frontend dev server |
+| `make test` | Run pytest |
+| `make clean` | Remove venv and cache files |
 
 ---
 
 ## Credits
 
 - **NYU SPS × UNICC AI Governance Capstone** — Spring 2026
-- Governance framework text adapted from: EU AI Act, NIST AI RMF 1.0, UNESCO Recommendation on Ethics of AI, OWASP Top 10 for LLM Applications, ISO/IEC 42001:2023, UNICC internal AI governance documentation
+- Governance frameworks: EU AI Act, NIST AI RMF, UNESCO AI Ethics, OWASP Top 10 for LLMs, ISO 42001, UNICC AI Governance
 
 ## License
 

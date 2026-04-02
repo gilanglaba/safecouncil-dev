@@ -1,8 +1,8 @@
 import logging
 import time
 
-import google.generativeai as genai
-from google.generativeai.types import GenerationConfig
+from google import genai
+from google.genai import types
 
 from experts.llm_providers.base_provider import LLMProvider, LLMResponse
 
@@ -14,22 +14,22 @@ class GoogleProvider(LLMProvider):
 
     def __init__(self, model: str, api_key: str, **kwargs):
         super().__init__(model=model, api_key=api_key)
-        genai.configure(api_key=api_key)
+        self.client = genai.Client(api_key=api_key)
 
     def call(self, system_prompt: str, user_message: str, max_tokens: int = 8192) -> LLMResponse:
         start = time.time()
         try:
-            config = GenerationConfig(
+            config = types.GenerateContentConfig(
                 response_mime_type="application/json",
                 max_output_tokens=max_tokens,
             )
-            model = genai.GenerativeModel(
-                model_name=self.model,
-                generation_config=config,
-            )
             # Gemini combines system + user in a single message
             combined = f"{system_prompt}\n\n---\n\n{user_message}"
-            response = model.generate_content(combined)
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=combined,
+                config=config,
+            )
             latency = time.time() - start
 
             input_tokens = 0
