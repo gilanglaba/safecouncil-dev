@@ -177,7 +177,13 @@ VERIMEDIIA_INPUT = {
         "migrants, and forcibly displaced populations. The system analyzes text, audio, and video "
         "content for xenophobic language, misinformation, and harmful content. It uses a fine-tuned "
         "GPT-3.5-Turbo model for toxicity classification (None/Mild/High/Max) and GPT-4o for "
-        "comprehensive analysis. Built as part of the UNICC project."
+        "comprehensive analysis, with OpenAI Whisper API for audio/video transcription. "
+        "Built as part of the UNICC project. "
+        "ARCHITECTURE NOTES: VeriMedia is a Flask web application with no authentication layer — "
+        "any user can access the upload interface without login. Files are uploaded via multipart "
+        "form POST to a /upload endpoint with a 500MB size limit. Uploaded files are stored "
+        "temporarily on disk without encryption. The application uses Flask sessions for state "
+        "management without CSRF protection. There is no audit trail for content analyzed."
     ),
     "system_prompt": (
         "You are an expert in analyzing media content for ethical reporting on topics related to "
@@ -333,11 +339,15 @@ VERIMEDIIA_INPUT = {
         },
     ],
     "environment": (
-        "Self-hosted Flask web application. Users upload text files (TXT, PDF, DOCX), audio files "
-        "(MP3, WAV, OGG), or video files (MP4, WEBM) through a browser interface. The system uses "
-        "OpenAI's GPT-4o for content analysis, a fine-tuned GPT-3.5-Turbo for toxicity classification, "
-        "and Whisper API for audio/video transcription. Designed for use by journalists and content "
-        "creators covering migration and refugee topics."
+        "Self-hosted Flask web application (Python/Flask framework) with no authentication or "
+        "access control layer. Users upload text files (TXT, PDF, DOCX), audio files "
+        "(MP3, WAV, OGG), or video files (MP4, WEBM) through an unauthenticated browser interface. "
+        "The file upload endpoint accepts files up to 500MB with no rate limiting. "
+        "The system uses OpenAI's GPT-4o API for content analysis, a fine-tuned GPT-3.5-Turbo "
+        "for toxicity classification, and Whisper API for audio/video transcription. "
+        "Temporary files are stored on local disk without encryption and cleaned up after processing. "
+        "Flask sessions manage state with a configurable SECRET_KEY but no CSRF protection. "
+        "Designed for use by journalists and content creators covering migration and refugee topics."
     ),
     "data_sensitivity": "Medium",
     "frameworks": ["eu_ai_act", "nist", "owasp", "unesco"],

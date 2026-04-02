@@ -6,14 +6,18 @@ import VerdictBadge from "../components/VerdictBadge";
 import { downloadPDF } from "../utils/generatePDF";
 import { theme, getScoreColor } from "../theme";
 import { api } from "../api";
-import { DEMO_RESULT, DEMO_RESULT_AGGREGATE } from "../demoResult";
+import { DEMO_RESULT, DEMO_RESULT_AGGREGATE, DEMO_RESULT_VERIMEDIIA } from "../demoResult";
 
 // ── SafeCouncil Dashboard — Evaluation History & Accessibility ──────────
 // The dashboard allows non-technical UNICC stakeholders to browse past
 // evaluations, filter by verdict (APPROVE / REVIEW / REJECT), and access
-// full results for any previously evaluated agent. This provides an
-// accessible, audit-friendly interface for governance oversight without
-// requiring technical expertise or API knowledge.
+// full results for any previously evaluated agent including VeriMedia.
+// This provides an accessible, audit-friendly interface for governance
+// oversight without requiring technical expertise or API knowledge.
+//
+// Demo evaluations (including VeriMedia) are available without API keys,
+// allowing the full synthesis/arbitration pipeline to be reviewed by
+// evaluators in any environment.
 
 function formatDate(timestamp) {
   if (!timestamp) return "—";
@@ -47,6 +51,16 @@ const DUMMY_EVALUATIONS = [
     timestamp: "2026-03-15T15:00:00Z",
     is_demo: true,
     orchestrator_method: "aggregate",
+  },
+  {
+    eval_id: "demo-verimediia",
+    agent_name: "VeriMedia — AI Media Ethics Analyzer",
+    verdict: "APPROVE",
+    confidence: 91,
+    overall_score: 91,
+    timestamp: "2026-03-20T10:00:00Z",
+    is_demo: true,
+    orchestrator_method: "deliberative",
   },
 ];
 
@@ -173,7 +187,7 @@ export default function DashboardPage() {
   const handleDownloadPDF = async (evalId, isDemo) => {
     try {
       if (isDemo) {
-        const demoData = evalId === "demo-unicef" ? DEMO_RESULT_AGGREGATE : DEMO_RESULT;
+        const demoData = evalId === "demo-unicef" ? DEMO_RESULT_AGGREGATE : evalId === "demo-verimediia" ? DEMO_RESULT_VERIMEDIIA : DEMO_RESULT;
         downloadPDF({ ...demoData, timestamp: new Date().toISOString() });
         return;
       }

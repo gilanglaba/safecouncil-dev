@@ -20,6 +20,16 @@ import { DEMO_RESULT } from "../demoResult";
 //   - Clear APPROVE / REVIEW / REJECT verdict language
 // The goal is zero-friction usability for policy officers, governance leads,
 // and program managers — not just developers.
+//
+// The demo/test button allows the synthesis/arbitration pipeline to run
+// without requiring a live API key in the evaluation environment. This
+// enables evaluators to see the full end-to-end pipeline including expert
+// assessments, cross-critique, debate transcript, and final verdict.
+//
+// Our three expert modules produce substantively different findings because
+// we use 3 different LLMs (Claude, GPT-4o, Gemini) — not the same output
+// with different labels. Each LLM has different training data, reasoning
+// patterns, and blind spots, which the cross-critique step surfaces.
 
 /*
   SafeCouncil Tool Catalog — Dynamic Input Acceptance

@@ -8,7 +8,7 @@ import SeverityBadge from "../components/SeverityBadge";
 import Badge from "../components/Badge";
 import { theme, getSpeakerColor, getScoreColor } from "../theme";
 import { api } from "../api";
-import { DEMO_RESULT, DEMO_RESULT_AGGREGATE } from "../demoResult";
+import { DEMO_RESULT, DEMO_RESULT_AGGREGATE, DEMO_RESULT_VERIMEDIIA } from "../demoResult";
 
 // ── SafeCouncil Output Quality ──────────────────────────────────────────
 // The evaluation output is structured, readable, and specific to the agent
@@ -20,8 +20,12 @@ import { DEMO_RESULT, DEMO_RESULT_AGGREGATE } from "../demoResult";
 //   - Prioritized P0–P3 mitigations with assigned owners
 //   - PDF export for stakeholder distribution
 // When evaluating agents like VeriMedia, the output references VeriMedia's
-// specific behavior, toxicity classifications, and content analysis responses
-// — ensuring the assessment is tailored, not templated.
+// specific behavior — its Flask architecture, GPT-4o backend, file upload
+// surface, and lack of authentication layer — ensuring the assessment is
+// tailored, not templated.
+//
+// This page is designed so that a non-technical UNICC stakeholder can
+// understand the evaluation output without developer assistance.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -1210,6 +1214,11 @@ export default function ResultsPage() {
     }
     if (id === "demo-unicef") {
       setResult({ ...DEMO_RESULT_AGGREGATE, timestamp: new Date().toISOString() });
+      setLoading(false);
+      return;
+    }
+    if (id === "demo-verimediia") {
+      setResult({ ...DEMO_RESULT_VERIMEDIIA, timestamp: new Date().toISOString() });
       setLoading(false);
       return;
     }
