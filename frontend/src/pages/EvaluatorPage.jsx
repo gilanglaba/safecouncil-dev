@@ -9,12 +9,28 @@ import { theme } from "../theme";
 import { api } from "../api";
 import { DEMO_RESULT } from "../demoResult";
 
-// ── Tool Catalog ──────────────────────────────────────────────────────────────
+/*
+  SafeCouncil Tool Catalog — Dynamic Input Acceptance
+
+  The Tool Catalog enables SafeCouncil to accept any AI agent as dynamic input without friction.
+  Users select an agent from the catalog, choose their expert panel and governance frameworks,
+  and submit — the system loads the agent's profile and runs a full multi-expert evaluation.
+
+  This includes third-party agents like VeriMedia (https://github.com/FlashCarrot/VeriMedia),
+  an AI-powered media ethics analyzer built for the UNICC project. VeriMedia is accepted as
+  dynamic input: the user selects it from the dropdown and SafeCouncil evaluates it across
+  all safety dimensions with independent expert assessments, cross-critique, and council synthesis.
+
+  The catalog is extensible — new agents can be added by defining their profile (name, use case,
+  system prompt, and representative conversations) in backend/demo_data.py and registering
+  their ID here.
+*/
 const TOOL_CATALOG = [
   { id: "wfp_support_bot", name: "WFP Support Bot", desc: "Customer support for humanitarian aid distribution, eligibility, and complaints" },
   { id: "unicef_gpt", name: "UNICEF-GPT", desc: "Child welfare Q&A, vaccination schedules, and education initiatives" },
   { id: "unhcr_refugee_assistant", name: "UNHCR Refugee Assistant", desc: "Asylum procedures, resettlement information, and legal rights" },
   { id: "who_health_advisor", name: "WHO Health Advisor", desc: "Health guidance, disease information, and vaccination recommendations" },
+  { id: "verimediia", name: "VeriMedia", desc: "AI-powered media analysis for detecting xenophobic language, misinformation, and harmful content — built for ethical journalism on refugees and migrants" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

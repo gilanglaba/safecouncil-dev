@@ -65,9 +65,9 @@ export const theme = {
 
 // Verdict color mapping
 export const verdictColors = {
-  GO: { bg: theme.greenPale, text: theme.green, border: theme.greenBorder },
-  CONDITIONAL: { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder },
-  "NO-GO": { bg: theme.redPale, text: theme.red, border: theme.redBorder },
+  APPROVE: { bg: theme.greenPale, text: theme.green, border: theme.greenBorder },
+  REVIEW: { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder },
+  REJECT: { bg: theme.redPale, text: theme.red, border: theme.redBorder },
 };
 
 // Severity color mapping

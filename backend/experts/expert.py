@@ -100,13 +100,11 @@ class Expert(BaseExpert):
                 )
             )
 
-        verdict_str = data.get("verdict", "CONDITIONAL").upper()
-        if verdict_str == "NO-GO":
-            verdict = Verdict.NO_GO
-        elif verdict_str == "GO":
-            verdict = Verdict.GO
-        else:
-            verdict = Verdict.CONDITIONAL
+        verdict_str = data.get("verdict", "REVIEW").upper()
+        try:
+            verdict = Verdict[verdict_str]
+        except KeyError:
+            verdict = Verdict.REVIEW
 
         assessment = ExpertAssessment(
             expert_name=self.name,
@@ -168,13 +166,11 @@ class Expert(BaseExpert):
                 )
             )
 
-        verdict_str = data.get("verdict", "CONDITIONAL").upper()
-        if verdict_str == "NO-GO":
-            verdict = Verdict.NO_GO
-        elif verdict_str == "GO":
-            verdict = Verdict.GO
-        else:
-            verdict = Verdict.CONDITIONAL
+        verdict_str = data.get("verdict", "REVIEW").upper()
+        try:
+            verdict = Verdict[verdict_str]
+        except KeyError:
+            verdict = Verdict.REVIEW
 
         revised = ExpertAssessment(
             expert_name=own_assessment.expert_name,
@@ -217,12 +213,13 @@ class Expert(BaseExpert):
         eval_input: "EvaluationInput",
         assessments: List[ExpertAssessment],
         critiques: List[str],
+        position_statements: List[dict] = None,
     ) -> str:
         """Generate synthesis, debate transcript, and final verdict."""
         logger.info(f"[{self.name}] Starting synthesis")
 
         system_prompt, user_message = build_synthesis_prompt(
-            eval_input, assessments, critiques
+            eval_input, assessments, critiques, position_statements
         )
 
         raw_response = self._call_llm(system_prompt, user_message)

@@ -12,7 +12,11 @@ from orchestrators.aggregate_orchestrator import AggregateOrchestrator
 
 logger = logging.getLogger(__name__)
 
-# Map strategy names to orchestrator classes
+# ── Orchestration Strategy Selection ─────────────────────────────────────
+# SafeCouncil supports multiple arbitration strategies for synthesizing the
+# final APPROVE/REVIEW/REJECT verdict from independent expert assessments.
+# All strategies ensure that the system accepts AI agents as dynamic input
+# and produces a council verdict through explicit multi-expert arbitration.
 ORCHESTRATOR_REGISTRY = {
     "deliberative": SimpleOrchestrator,   # Method B: debate & deliberate (current default)
     "aggregate": AggregateOrchestrator,   # Method A: vote & average

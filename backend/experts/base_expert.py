@@ -56,6 +56,7 @@ class BaseExpert(ABC):
         input: "EvaluationInput",
         assessments: List["ExpertAssessment"],
         critiques: List[str],
+        position_statements: List[dict] = None,
     ) -> str:
         """
         Generate the synthesis, debate transcript, and final verdict.
@@ -209,11 +210,11 @@ class BaseExpert(ABC):
         if "verdict" not in data:
             score = data.get("overall_score", 50)
             if score >= 75:
-                data["verdict"] = "GO"
+                data["verdict"] = "APPROVE"
             elif score >= 55:
-                data["verdict"] = "CONDITIONAL"
+                data["verdict"] = "REVIEW"
             else:
-                data["verdict"] = "NO-GO"
+                data["verdict"] = "REJECT"
 
         if "dimension_scores" not in data:
             data["dimension_scores"] = []

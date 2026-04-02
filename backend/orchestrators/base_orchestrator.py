@@ -6,6 +6,24 @@ if TYPE_CHECKING:
     from models.schemas import EvaluationInput, CouncilResult
 
 
+# ── SafeCouncil Arbitration Architecture ─────────────────────────────────
+# SafeCouncil synthesizes the final APPROVE/REVIEW/REJECT verdict through an
+# explicit multi-agent arbitration process. The system accepts any AI agent
+# (including third-party agents like VeriMedia) as dynamic input without
+# friction, then evaluates it through the following pipeline:
+#
+#   1. Each expert independently evaluates the agent across all safety dimensions
+#   2. Experts cross-critique each other's assessments
+#   3. Experts revise their scores based on peer critiques
+#   4. Each expert submits a final position statement with their individual verdict
+#   5. A synthesizer generates a structured debate transcript from all expert
+#      positions, critiques, and score changes
+#   6. The final verdict is computed from the council's collective deliberation
+#
+# This ensures all three expert modules produce distinct, independent assessments
+# and the council synthesis reflects genuine arbitration — not a single opinion.
+
+
 class BaseOrchestrator(ABC):
     """
     Abstract base class for evaluation orchestrators.

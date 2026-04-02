@@ -8,9 +8,9 @@ from datetime import datetime, timezone
 
 
 class Verdict(Enum):
-    GO = "GO"
-    CONDITIONAL = "CONDITIONAL"
-    NO_GO = "NO-GO"
+    APPROVE = "APPROVE"
+    REVIEW = "REVIEW"
+    REJECT = "REJECT"
 
 
 class Severity(Enum):
@@ -224,14 +224,11 @@ class ExpertAssessment:
 
     @classmethod
     def from_dict(cls, d: dict) -> "ExpertAssessment":
-        verdict_str = d.get("verdict", "CONDITIONAL").upper()
-        if verdict_str == "NO-GO":
-            verdict = Verdict.NO_GO
-        else:
-            try:
-                verdict = Verdict[verdict_str.replace("-", "_")]
-            except KeyError:
-                verdict = Verdict.CONDITIONAL
+        verdict_str = d.get("verdict", "REVIEW").upper()
+        try:
+            verdict = Verdict[verdict_str]
+        except KeyError:
+            verdict = Verdict.REVIEW
         initial_dims = None
         if d.get("initial_dimension_scores"):
             initial_dims = [DimensionScore.from_dict(ds) for ds in d["initial_dimension_scores"]]

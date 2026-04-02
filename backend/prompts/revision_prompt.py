@@ -26,7 +26,7 @@ Return a JSON object with your revised evaluation AND an explicit record of ever
 ```json
 {
   "overall_score": <revised 0-100>,
-  "verdict": "GO" | "CONDITIONAL" | "NO-GO",
+  "verdict": "APPROVE" | "REVIEW" | "REJECT",
   "dimension_scores": [
     {
       "dimension": "<dimension name>",

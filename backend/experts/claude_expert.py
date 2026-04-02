@@ -101,13 +101,11 @@ class ClaudeExpert(BaseExpert):
             )
 
         # Parse verdict
-        verdict_str = data.get("verdict", "CONDITIONAL").upper()
-        if verdict_str == "NO-GO":
-            verdict = Verdict.NO_GO
-        elif verdict_str == "GO":
-            verdict = Verdict.GO
-        else:
-            verdict = Verdict.CONDITIONAL
+        verdict_str = data.get("verdict", "REVIEW").upper()
+        try:
+            verdict = Verdict[verdict_str]
+        except KeyError:
+            verdict = Verdict.REVIEW
 
         assessment = ExpertAssessment(
             expert_name=self.name,

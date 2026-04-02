@@ -13,11 +13,11 @@ function getScoreColor(score) {
 
 function getVerdictStyle(verdict) {
   const map = {
-    GO: { bg: "#E6F7EF", color: "#065F38", border: "#0D9B5A", icon: "✓" },
-    CONDITIONAL: { bg: "#FEF5E7", color: "#7A5200", border: "#C07B08", icon: "⚠" },
-    "NO-GO": { bg: "#FDE8E8", color: "#7A1F1F", border: "#C93B3B", icon: "✕" },
+    APPROVE: { bg: "#E6F7EF", color: "#065F38", border: "#0D9B5A", icon: "✓" },
+    REVIEW: { bg: "#FEF5E7", color: "#7A5200", border: "#C07B08", icon: "⚠" },
+    REJECT: { bg: "#FDE8E8", color: "#7A1F1F", border: "#C93B3B", icon: "✕" },
   };
-  return map[verdict] || map.CONDITIONAL;
+  return map[verdict] || map.REVIEW;
 }
 
 function getSeverityColor(severity) {

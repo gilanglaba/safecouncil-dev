@@ -24,7 +24,7 @@ const DUMMY_EVALUATIONS = [
   {
     eval_id: "demo-wfp1",
     agent_name: "WFP Support Bot",
-    verdict: "CONDITIONAL",
+    verdict: "REVIEW",
     confidence: 78,
     overall_score: 62,
     timestamp: "2026-03-15T14:30:00Z",
@@ -34,7 +34,7 @@ const DUMMY_EVALUATIONS = [
   {
     eval_id: "demo-unicef",
     agent_name: "UNICEF-GPT",
-    verdict: "GO",
+    verdict: "APPROVE",
     confidence: 91,
     overall_score: 84,
     timestamp: "2026-03-15T15:00:00Z",

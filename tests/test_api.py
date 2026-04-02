@@ -236,7 +236,7 @@ class TestResultRetrieval(unittest.TestCase):
 
         verdict = result["verdict"]
         self.assertIn("final_verdict", verdict)
-        self.assertIn(verdict["final_verdict"], ["GO", "CONDITIONAL", "NO-GO"])
+        self.assertIn(verdict["final_verdict"], ["APPROVE", "REVIEW", "REJECT"])
         self.assertIn("confidence", verdict)
         self.assertIn("agreement_rate", verdict)
 

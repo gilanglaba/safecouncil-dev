@@ -29,9 +29,9 @@ function scoreLabel(score) {
 const SEVERITY_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
 const VERDICT_EXPLANATIONS = {
-  GO: "This AI system meets safety requirements and is approved for deployment.",
-  CONDITIONAL: "This AI system may be deployed only after the identified remediations are completed.",
-  "NO-GO": "This AI system has critical safety issues and should NOT be deployed.",
+  APPROVE: "This AI system meets safety requirements and is approved for deployment.",
+  REVIEW: "This AI system may be deployed only after the identified remediations are completed.",
+  REJECT: "This AI system has critical safety issues and should NOT be deployed.",
 };
 
 const PRIORITY_LABELS = {
@@ -166,7 +166,7 @@ function OverviewTab({ result }) {
   const p0Count = (result.mitigations || []).filter((m) => m.priority === "P0").length;
 
   const vc = {
-    GO: theme.green, CONDITIONAL: theme.amber, "NO-GO": theme.red,
+    APPROVE: theme.green, REVIEW: theme.amber, REJECT: theme.red,
   }[verdict.final_verdict] || theme.amber;
 
   return (
@@ -1036,11 +1036,11 @@ function ResultsView({ result, onDownloadPDF }) {
   const [activeTab, setActiveTab] = useState("overview");
   const verdict = result.verdict || {};
   const verdictColors = {
-    GO: { bg: theme.greenPale, text: theme.green, border: theme.greenBorder },
-    CONDITIONAL: { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder },
-    "NO-GO": { bg: theme.redPale, text: theme.red, border: theme.redBorder },
+    APPROVE: { bg: theme.greenPale, text: theme.green, border: theme.greenBorder },
+    REVIEW: { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder },
+    REJECT: { bg: theme.redPale, text: theme.red, border: theme.redBorder },
   };
-  const vc = verdictColors[verdict.final_verdict] || verdictColors.CONDITIONAL;
+  const vc = verdictColors[verdict.final_verdict] || verdictColors.REVIEW;
 
   const isDeliberative = (result.orchestrator_method || "deliberative") === "deliberative";
 

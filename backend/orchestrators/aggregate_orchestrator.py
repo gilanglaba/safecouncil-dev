@@ -27,6 +27,14 @@ STEP_GOVERNANCE = 0
 STEP_AGGREGATE = -1  # Set dynamically
 
 
+# ── SafeCouncil Aggregate Arbitration ────────────────────────────────────
+# The aggregate orchestrator provides an alternative arbitration method where
+# the final APPROVE/REVIEW/REJECT verdict is determined by majority vote
+# across all independent expert assessments. Each expert evaluates the agent
+# independently, and the council verdict reflects their collective judgment
+# through statistical consensus rather than deliberative debate.
+
+
 class AggregateOrchestrator(BaseOrchestrator):
     """
     Method A: Independent Scoring with Statistical Aggregation.

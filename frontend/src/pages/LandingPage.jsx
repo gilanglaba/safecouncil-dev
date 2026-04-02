@@ -39,7 +39,7 @@ const FEATURES = [
   { icon: "📋", title: "Governance & Compliance", desc: "Evaluate against EU AI Act, NIST AI RMF, OWASP Top 10 for LLMs, UNESCO Ethics, ISO 42001, and UNICC UN-specific standards." },
   { icon: "🔍", title: "Trust & Transparency", desc: "Automated scoring on privacy protection, human oversight adequacy, accuracy, and disclosure practices — with specific evidence from your conversations." },
   { icon: "⚖️", title: "Cross-Critique & Debate", desc: "Three AI experts independently evaluate your agent, then critique each other — surfacing disagreements that single-model evaluation misses." },
-  { icon: "📊", title: "Auditable Verdicts", desc: "GO / CONDITIONAL / NO-GO verdicts with confidence scores, agreement rates, and complete JSON audit logs suitable for UN governance requirements." },
+  { icon: "📊", title: "Auditable Verdicts", desc: "APPROVE / REVIEW / REJECT verdicts with confidence scores, agreement rates, and complete JSON audit logs suitable for UN governance requirements." },
   { icon: "🌐", title: "UN-Ready Governance", desc: "Built for humanitarian deployments. Includes UNICC AI sandbox requirements, beneficiary data sovereignty, and multi-language context." },
 ];
 
@@ -47,23 +47,23 @@ const STEPS = [
   { num: "01", title: "Submit", desc: "Provide your agent's system prompt, use case, deployment context, and sample conversations. Or click 'Load Demo' for an instant example." },
   { num: "02", title: "Evaluate", desc: "Three independent AI experts (Claude, GPT-4o, Gemini) each evaluate your agent across 15 safety dimensions using a rigorous rubric." },
   { num: "03", title: "Critique", desc: "Each expert reviews the others' assessments — challenging score differences, surfacing missed risks, and identifying genuine consensus." },
-  { num: "04", title: "Verdict", desc: "A structured debate transcript is generated, leading to a GO / CONDITIONAL / NO-GO verdict with prioritized P0–P3 mitigations." },
+  { num: "04", title: "Verdict", desc: "A structured debate transcript is generated, leading to a APPROVE / REVIEW / REJECT verdict with prioritized P0–P3 mitigations." },
 ];
 
 const TERMINAL_LINES = [
   { text: "$ safecouncil evaluate --agent 'WFP Support Bot v2.1'", color: "#C8A8F0" },
   { text: "✓ Governance context loaded (EU AI Act, NIST, OWASP, UNESCO)", color: "#9ADBBF" },
   { text: "⠋ Expert A (Claude) evaluating... [15 dimensions]", color: "#F5D28A" },
-  { text: "✓ Expert A complete — Score: 76/100 — CONDITIONAL", color: "#9ADBBF" },
+  { text: "✓ Expert A complete — Score: 76/100 — REVIEW", color: "#9ADBBF" },
   { text: "⠋ Expert B (GPT-4o) evaluating... [15 dimensions]", color: "#F5D28A" },
-  { text: "✓ Expert B complete — Score: 79/100 — CONDITIONAL", color: "#9ADBBF" },
+  { text: "✓ Expert B complete — Score: 79/100 — REVIEW", color: "#9ADBBF" },
   { text: "⠋ Expert C (Gemini) evaluating... [15 dimensions]", color: "#F5D28A" },
-  { text: "✓ Expert C complete — Score: 72/100 — CONDITIONAL", color: "#9ADBBF" },
+  { text: "✓ Expert C complete — Score: 72/100 — REVIEW", color: "#9ADBBF" },
   { text: "⠋ Cross-critique round in progress...", color: "#F5D28A" },
   { text: "✓ Council debate & synthesis complete", color: "#9ADBBF" },
   { text: "", color: "" },
   { text: "━━━ COUNCIL VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━", color: "#7B5BAF" },
-  { text: "⚠  CONDITIONAL  (confidence: 87% | agreement: 84%)", color: "#F5D28A" },
+  { text: "⚠  REVIEW  (confidence: 87% | agreement: 84%)", color: "#F5D28A" },
   { text: "P0  Fix prompt injection — Engineering", color: "#FF6B6B" },
   { text: "P1  Strengthen data minimization — Product", color: "#F5D28A" },
   { text: "P2  Add Arabic language accuracy testing — QA", color: "#C8A8F0" },

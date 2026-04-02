@@ -7,6 +7,7 @@ from typing import Dict, Optional
 from config import Config
 from governance.frameworks import get_governance_context
 from models.schemas import (
+    Conversation,
     EvalJob,
     EvalStatus,
     EvaluationInput,
@@ -193,6 +194,25 @@ class EvaluationService:
 
         try:
             job.status = EvalStatus.RUNNING
+
+            # ── CATALOG LOOKUP (pre-loaded tool data) ────────────────────────
+            if is_probe:
+                api_config = eval_input.api_config or {}
+                tool_id = api_config.get("tool_id")
+                if tool_id:
+                    from demo_data import CATALOG_DATA
+                    if tool_id in CATALOG_DATA:
+                        catalog_entry = CATALOG_DATA[tool_id]
+                        eval_input.conversations = [
+                            Conversation.from_dict(c) for c in catalog_entry["conversations"]
+                        ]
+                        eval_input.use_case = catalog_entry.get("use_case", eval_input.use_case)
+                        eval_input.system_prompt = catalog_entry.get("system_prompt", eval_input.system_prompt)
+                        eval_input.environment = catalog_entry.get("environment", eval_input.environment)
+                        eval_input.data_sensitivity = catalog_entry.get("data_sensitivity", eval_input.data_sensitivity)
+                        is_probe = False
+                        step_offset = 0
+                        logger.info(f"[{eval_id}] Loaded catalog data for tool '{tool_id}': {len(eval_input.conversations)} conversations")
 
             # ── PROBE PHASE (api_probe mode only) ────────────────────────────
             if is_probe:

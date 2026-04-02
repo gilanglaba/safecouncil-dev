@@ -30,9 +30,9 @@ export default function VerdictBadge({ verdict, size = "md" }) {
         ...sizes[size],
       }}
     >
-      {verdict === "GO" && "✓ "}
-      {verdict === "CONDITIONAL" && "⚠ "}
-      {verdict === "NO-GO" && "✕ "}
+      {verdict === "APPROVE" && "✓ "}
+      {verdict === "REVIEW" && "⚠ "}
+      {verdict === "REJECT" && "✕ "}
       {verdict || "—"}
     </span>
   );
