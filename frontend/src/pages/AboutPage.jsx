@@ -6,23 +6,26 @@ const TEAM = [
   {
     initials: "GL",
     name: "Gilang Laba",
-    role: "Product Manager",
+    role: "AI Product Engineer & Architect",
     color: theme.violet,
-    desc: "Product leader focused on building AI products that are safe, trustworthy, and governance-ready.",
+    photo: "/gilang.jpg",
+    desc: "Leads SafeCouncil's product vision, system architecture, and multi-agent evaluation research.",
   },
   {
     initials: "JM",
     name: "Jimmy Pengyun Ma",
-    role: "AI Researcher",
+    role: "AI Systems Engineer",
     color: theme.unBlueDark,
-    desc: "Specializes in AI governance and safety. Researching how multi-agent systems can improve AI safety assessment reliability.",
+    photo: "/jimmy.jpg",
+    desc: "Architects SafeCouncil's modular platform, from provider-agnostic infrastructure to local LLM deployment and governance operationalization.",
   },
   {
     initials: "IZ",
     name: "Iris Zhang",
-    role: "AI System Developer",
+    role: "UX Engineer",
     color: theme.green,
-    desc: "Full-stack developer focused on how organizations can utilize AI technology. Building SafeCouncil's web platform.",
+    photo: "/iris.jpg",
+    desc: "Designs and builds SafeCouncil's user experience, from evaluation result transparency to user study validation.",
   },
 ];
 
@@ -58,31 +61,47 @@ function PersonCard({ person, size = "lg" }) {
       }}
     >
       {/* Avatar */}
-      <div
-        style={{
-          width: isLg ? 96 : 72,
-          height: isLg ? 96 : 72,
-          borderRadius: "50%",
-          background: theme.bgWarm,
-          border: `2px dashed ${person.color}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: 16,
-          flexShrink: 0,
-        }}
-      >
-        <span
+      {person.photo ? (
+        <img
+          src={person.photo}
+          alt={person.name}
           style={{
-            fontFamily: theme.fontSerif,
-            fontSize: isLg ? 28 : 22,
-            color: person.color,
-            fontWeight: 400,
+            width: isLg ? 96 : 72,
+            height: isLg ? 96 : 72,
+            borderRadius: "50%",
+            objectFit: "cover",
+            border: `2px solid ${person.color}`,
+            marginBottom: 16,
+            flexShrink: 0,
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            width: isLg ? 96 : 72,
+            height: isLg ? 96 : 72,
+            borderRadius: "50%",
+            background: theme.bgWarm,
+            border: `2px dashed ${person.color}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 16,
+            flexShrink: 0,
           }}
         >
-          {person.initials}
-        </span>
-      </div>
+          <span
+            style={{
+              fontFamily: theme.fontSerif,
+              fontSize: isLg ? 28 : 22,
+              color: person.color,
+              fontWeight: 400,
+            }}
+          >
+            {person.initials}
+          </span>
+        </div>
+      )}
 
       <div style={{ fontWeight: 700, fontSize: isLg ? 16 : 14, color: theme.text, marginBottom: 4 }}>
         {person.name}

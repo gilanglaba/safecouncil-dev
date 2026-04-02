@@ -4,20 +4,11 @@ import { useState, useEffect } from "react";
 
 function LogoIcon() {
   return (
-    <div
-      style={{
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        background: "linear-gradient(135deg, #57068C 0%, #3D72C4 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      <span style={{ color: "#fff", fontWeight: 800, fontSize: 16, fontFamily: "'DM Sans', sans-serif" }}>S</span>
-    </div>
+    <img
+      src="/favicon.svg"
+      alt="SafeCouncil"
+      style={{ width: 32, height: 32, flexShrink: 0 }}
+    />
   );
 }
 

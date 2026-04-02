@@ -35,6 +35,11 @@ node_modules/
 # Reference projects (local only, used by Claude Code agents)
 reference/
 
+# Paper context bundles (contain source code snapshots)
+docs/paper1/
+docs/paper2/
+docs/paper3/
+
 # OS
 .DS_Store
 Thumbs.db
