@@ -48,12 +48,43 @@ import { DEMO_RESULT } from "../demoResult";
   their ID here.
 */
 const TOOL_CATALOG = [
-  { id: "wfp_support_bot", name: "WFP Support Bot", desc: "Customer support for humanitarian aid distribution, eligibility, and complaints" },
-  { id: "unicef_gpt", name: "UNICEF-GPT", desc: "Child welfare Q&A, vaccination schedules, and education initiatives" },
-  { id: "unhcr_refugee_assistant", name: "UNHCR Refugee Assistant", desc: "Asylum procedures, resettlement information, and legal rights" },
-  { id: "who_health_advisor", name: "WHO Health Advisor", desc: "Health guidance, disease information, and vaccination recommendations" },
+  { id: "wfp_support_bot", name: "WFP Support Bot [DEMO]", desc: "Customer support for humanitarian aid distribution, eligibility, and complaints" },
+  { id: "unicef_gpt", name: "UNICEF-GPT [DEMO]", desc: "Child welfare Q&A, vaccination schedules, and education initiatives" },
+  { id: "unhcr_refugee_assistant", name: "UNHCR Refugee Assistant [DEMO]", desc: "Asylum procedures, resettlement information, and legal rights" },
+  { id: "who_health_advisor", name: "WHO Health Advisor [DEMO]", desc: "Health guidance, disease information, and vaccination recommendations" },
   { id: "verimediia", name: "VeriMedia", desc: "AI-powered media analysis for detecting xenophobic language, misinformation, and harmful content — built for ethical journalism on refugees and migrants" },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Tooltip({ text }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      style={{ position: "relative", display: "inline-flex", alignItems: "center", marginLeft: 4, cursor: "help" }}
+    >
+      <span style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 16, height: 16, borderRadius: "50%", fontSize: 10, fontWeight: 700,
+        background: theme.border, color: theme.textTer,
+      }}>i</span>
+      {show && (
+        <span style={{
+          position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)",
+          background: theme.text, color: "#fff", fontSize: 12, lineHeight: 1.5, padding: "8px 12px",
+          borderRadius: 8, width: 260, zIndex: 50, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          pointerEvents: "none",
+        }}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INPUT PHASE
@@ -482,20 +513,12 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
 
       {/* ── SECTION 2: Expert Configuration ───────────────────────────────── */}
       <div style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 28, marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div style={{ marginBottom: 20 }}>
           <SectionHead num="2" title="Expert Configuration" badge={<Badge color={theme.textTer}>{activeExperts} active</Badge>} />
-          <button
-            onClick={() => alert("Add Expert will be available soon.")}
-            style={{ fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 8, border: `1px solid ${theme.border}`, cursor: "pointer", background: theme.surface, color: theme.violet }}
-          >
-            + Add Expert
-          </button>
         </div>
         <p style={{ fontSize: 13, color: theme.textTer, margin: "-12px 0 16px", lineHeight: 1.5 }}>
           Each expert independently evaluates the same <strong style={{ color: theme.textSec }}>unified rubric</strong> across Safety, Governance, and Trust. Multiple vendors ensure diverse perspectives.
-        </p>
-        <p style={{ fontSize: 12, color: theme.textTer, margin: "0 0 12px", padding: "8px 12px", background: theme.bgWarm, borderRadius: 8 }}>
-          💡 <strong>Tip:</strong> Enable at least 2 experts for cross-critique. Using all 3 gives the most thorough evaluation with diverse AI perspectives.
+          <Tooltip text="Enable at least 2 experts for cross-critique. Using all 3 gives the most thorough evaluation with diverse AI perspectives." />
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
           {experts.map((ex) => (
@@ -547,9 +570,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
         <SectionHead num="3" title="Governance Frameworks & Context" badge={<Badge color={theme.violet}>{selectedFrameworks} selected</Badge>} />
         <p style={{ fontSize: 13, color: theme.textTer, margin: "-12px 0 16px", lineHeight: 1.5 }}>
           Select which governance standards to evaluate against. Experts will reference these frameworks via RAG (Retrieval-Augmented Generation) to cite specific regulations in their assessments.
-        </p>
-        <p style={{ fontSize: 12, color: theme.textTer, margin: "0 0 12px", padding: "8px 12px", background: theme.bgWarm, borderRadius: 8 }}>
-          💡 <strong>Tip:</strong> The default frameworks (EU AI Act, NIST, UNESCO, OWASP) cover most use cases. Add ISO 42001 for management system compliance or UNICC for UN-specific data sovereignty requirements.
+          <Tooltip text="The default frameworks (EU AI Act, NIST, UNESCO, OWASP) cover most use cases. Add ISO 42001 for management system compliance or UNICC for UN-specific data sovereignty requirements." />
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
           {frameworks.map((f) => (
@@ -733,10 +754,10 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
 
       {/* ── SECTION 4: Orchestration Method ────────────────────────────────── */}
       <div style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 28, marginBottom: 16 }}>
-        <SectionHead num="4" title="Council Method" />
-        <p style={{ fontSize: 12, color: theme.textTer, margin: "-8px 0 12px", padding: "8px 12px", background: theme.bgWarm, borderRadius: 8 }}>
-          💡 <strong>Tip:</strong> "Deliberative" is recommended — experts debate and revise their scores. "Aggregate" is faster but skips the cross-critique step.
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <SectionHead num="4" title="Council Method" />
+          <Tooltip text={'"Deliberative" is recommended — experts debate and revise their scores. "Aggregate" is faster but skips the cross-critique step.'} />
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[
             {

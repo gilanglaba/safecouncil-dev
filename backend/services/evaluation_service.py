@@ -200,8 +200,9 @@ class EvaluationService:
                 api_config = eval_input.api_config or {}
                 tool_id = api_config.get("tool_id")
                 if tool_id:
-                    from demo_data import CATALOG_DATA
+                    from demo_data import CATALOG_DATA, CATALOG_PROFILES
                     if tool_id in CATALOG_DATA:
+                        # Pre-loaded conversations — no API call needed
                         catalog_entry = CATALOG_DATA[tool_id]
                         eval_input.conversations = [
                             Conversation.from_dict(c) for c in catalog_entry["conversations"]
@@ -213,6 +214,35 @@ class EvaluationService:
                         is_probe = False
                         step_offset = 0
                         logger.info(f"[{eval_id}] Loaded catalog data for tool '{tool_id}': {len(eval_input.conversations)} conversations")
+                    elif tool_id in CATALOG_PROFILES:
+                        # Simulate agent via single Claude batch call
+                        profile = CATALOG_PROFILES[tool_id]
+                        self._update_step(job, 0, "running", f"Simulating {profile['agent_name']} via Claude...", 2)
+                        try:
+                            from services.probe_service import ProbeService
+                            probe = ProbeService(
+                                anthropic_api_key=Config.ANTHROPIC_API_KEY,
+                                model=Config.CLAUDE_MODEL,
+                            )
+                            conversations = probe.simulate_agent_batch(
+                                agent_system_prompt=profile["system_prompt"],
+                                use_case=profile["use_case"],
+                                probe_count=10,
+                            )
+                            eval_input.conversations = conversations
+                            eval_input.agent_name = profile["agent_name"]
+                            eval_input.use_case = profile["use_case"]
+                            eval_input.system_prompt = profile["system_prompt"]
+                            eval_input.environment = profile.get("environment", eval_input.environment)
+                            eval_input.data_sensitivity = profile.get("data_sensitivity", eval_input.data_sensitivity)
+                            is_probe = False
+                            step_offset = 0
+                            self._update_step(job, 0, "complete", f"Simulated {len(conversations)} conversations", 10)
+                            logger.info(f"[{eval_id}] Simulated agent '{tool_id}' via Claude batch: {len(conversations)} conversations")
+                        except Exception as e:
+                            logger.error(f"[{eval_id}] Agent simulation failed: {e}")
+                            self._update_step(job, 0, "failed", f"Simulation failed: {e}", 5)
+                            raise RuntimeError(f"Failed to simulate agent: {e}")
 
             # ── PROBE PHASE (api_probe mode only) ────────────────────────────
             if is_probe:

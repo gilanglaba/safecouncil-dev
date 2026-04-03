@@ -3,6 +3,7 @@ AggregateOrchestrator — Method A: Statistical Consensus.
 Each expert evaluates independently, scores are averaged, verdict by majority vote.
 No inter-agent communication. Fast and deterministic.
 """
+import concurrent.futures
 import logging
 import time
 from typing import List, Callable, Optional
@@ -58,26 +59,47 @@ class AggregateOrchestrator(BaseOrchestrator):
         self._fire_progress(on_progress, STEP_GOVERNANCE, "complete",
                             "Governance context loaded", 5)
 
-        # ── Steps 1..N: Independent expert evaluations ────────────────────
+        # ── Steps 1..N: Independent expert evaluations (PARALLEL) ─────────
         assessments: List[ExpertAssessment] = []
+
+        # Mark all experts as running
         for i, expert in enumerate(self.experts):
             step_idx = STEP_GOVERNANCE + 1 + i
             progress_pct = 5 + int((i / num_experts) * 80)
-
             self._fire_progress(on_progress, step_idx, "running",
                                 f"{expert.name} evaluating...", progress_pct)
-            try:
-                assessment = expert.evaluate(eval_input, governance_context)
-                assessments.append(assessment)
-                total_api_calls += expert.total_api_calls
-                total_input_tokens += expert.total_input_tokens
-                total_output_tokens += expert.total_output_tokens
-                self._fire_progress(on_progress, step_idx, "complete",
-                                    f"{expert.name} complete", progress_pct + int(80 / num_experts))
-            except Exception as e:
-                logger.error(f"Expert {expert.name} failed: {e}")
-                self._fire_progress(on_progress, step_idx, "failed",
-                                    f"{expert.name} failed: {str(e)[:100]}", progress_pct)
+
+        def _evaluate_expert(idx_expert):
+            idx, expert = idx_expert
+            return idx, expert, expert.evaluate(eval_input, governance_context)
+
+        indexed_assessments = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_experts) as executor:
+            futures = {
+                executor.submit(_evaluate_expert, (i, expert)): i
+                for i, expert in enumerate(self.experts)
+            }
+            for future in concurrent.futures.as_completed(futures):
+                orig_idx = futures[future]
+                step_idx = STEP_GOVERNANCE + 1 + orig_idx
+                progress_pct = 5 + int(((orig_idx + 1) / num_experts) * 80)
+                try:
+                    idx, expert, assessment = future.result()
+                    indexed_assessments.append((idx, assessment))
+                    total_api_calls += expert.total_api_calls
+                    total_input_tokens += expert.total_input_tokens
+                    total_output_tokens += expert.total_output_tokens
+                    self._fire_progress(on_progress, step_idx, "complete",
+                                        f"{expert.name} complete", progress_pct)
+                except Exception as e:
+                    expert = self.experts[orig_idx]
+                    logger.error(f"Expert {expert.name} failed: {e}")
+                    self._fire_progress(on_progress, step_idx, "failed",
+                                        f"{expert.name} failed: {str(e)[:100]}", progress_pct)
+
+        # Sort by original index to maintain expert order
+        indexed_assessments.sort(key=lambda x: x[0])
+        assessments = [a for _, a in indexed_assessments]
 
         if not assessments:
             raise RuntimeError("All experts failed. Cannot produce evaluation.")
