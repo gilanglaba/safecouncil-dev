@@ -8,7 +8,7 @@ import SeverityBadge from "../components/SeverityBadge";
 import Badge from "../components/Badge";
 import { theme, getSpeakerColor, getScoreColor } from "../theme";
 import { api } from "../api";
-import { DEMO_RESULT, DEMO_RESULT_AGGREGATE, DEMO_RESULT_VERIMEDIIA } from "../demoResult";
+import { DEMO_RESULT, DEMO_RESULT_AGGREGATE, DEMO_RESULT_VERIMEDIA } from "../demoResult";
 
 // ── SafeCouncil Output Quality ──────────────────────────────────────────
 // The evaluation output is structured, readable, and specific to the agent
@@ -1217,8 +1217,8 @@ export default function ResultsPage() {
       setLoading(false);
       return;
     }
-    if (id === "demo-verimediia") {
-      setResult({ ...DEMO_RESULT_VERIMEDIIA, timestamp: new Date().toISOString() });
+    if (id === "demo-verimedia") {
+      setResult({ ...DEMO_RESULT_VERIMEDIA, timestamp: new Date().toISOString() });
       setLoading(false);
       return;
     }

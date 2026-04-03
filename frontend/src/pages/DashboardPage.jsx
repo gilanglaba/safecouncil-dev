@@ -6,7 +6,7 @@ import VerdictBadge from "../components/VerdictBadge";
 import { downloadPDF } from "../utils/generatePDF";
 import { theme, getScoreColor } from "../theme";
 import { api } from "../api";
-import { DEMO_RESULT, DEMO_RESULT_AGGREGATE, DEMO_RESULT_VERIMEDIIA } from "../demoResult";
+import { DEMO_RESULT, DEMO_RESULT_AGGREGATE, DEMO_RESULT_VERIMEDIA } from "../demoResult";
 
 // ── SafeCouncil Dashboard — Evaluation History & Accessibility ──────────
 // The dashboard allows non-technical UNICC stakeholders to browse past
@@ -53,7 +53,7 @@ const DUMMY_EVALUATIONS = [
     orchestrator_method: "aggregate",
   },
   {
-    eval_id: "demo-verimediia",
+    eval_id: "demo-verimedia",
     agent_name: "VeriMedia — AI Media Ethics Analyzer",
     verdict: "APPROVE",
     confidence: 91,
@@ -187,7 +187,7 @@ export default function DashboardPage() {
   const handleDownloadPDF = async (evalId, isDemo) => {
     try {
       if (isDemo) {
-        const demoData = evalId === "demo-unicef" ? DEMO_RESULT_AGGREGATE : evalId === "demo-verimediia" ? DEMO_RESULT_VERIMEDIIA : DEMO_RESULT;
+        const demoData = evalId === "demo-unicef" ? DEMO_RESULT_AGGREGATE : evalId === "demo-verimedia" ? DEMO_RESULT_VERIMEDIA : DEMO_RESULT;
         downloadPDF({ ...demoData, timestamp: new Date().toISOString() });
         return;
       }

@@ -7,7 +7,7 @@ import SectionHead from "../components/SectionHead";
 import CompanyIcon from "../components/CompanyIcon";
 import { theme } from "../theme";
 import { api } from "../api";
-import { DEMO_RESULT } from "../demoResult";
+import { DEMO_RESULT, DEMO_RESULT_VERIMEDIA } from "../demoResult";
 
 // ── SafeCouncil UX Design for Non-Technical Stakeholders ────────────────
 // This evaluator page is designed so that a non-technical UNICC stakeholder
@@ -52,7 +52,7 @@ const TOOL_CATALOG = [
   { id: "unicef_gpt", name: "UNICEF-GPT [DEMO]", desc: "Child welfare Q&A, vaccination schedules, and education initiatives" },
   { id: "unhcr_refugee_assistant", name: "UNHCR Refugee Assistant [DEMO]", desc: "Asylum procedures, resettlement information, and legal rights" },
   { id: "who_health_advisor", name: "WHO Health Advisor [DEMO]", desc: "Health guidance, disease information, and vaccination recommendations" },
-  { id: "verimediia", name: "VeriMedia", desc: "AI-powered media analysis for detecting xenophobic language, misinformation, and harmful content — built for ethical journalism on refugees and migrants" },
+  { id: "verimedia", name: "VeriMedia", desc: "AI-powered media analysis for detecting xenophobic language, misinformation, and harmful content — built for ethical journalism on refugees and migrants" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -312,7 +312,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
           <p style={{ fontSize: 14, color: theme.textTer }}>Three independent LLMs evaluate the same agent using a unified rubric, then debate their findings</p>
         </div>
         <button
-          onClick={onDemoLoad}
+          onClick={() => onDemoLoad(selectedTool)}
           disabled={submitting}
           style={{
             fontSize: 13,
@@ -870,7 +870,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
 // EVALUATING PHASE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onComplete, onError, demoMode }) {
+function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onComplete, onError, demoMode, demoTool }) {
   const [statusData, setStatusData] = useState(null);
   const intervalRef = useRef(null);
 
@@ -921,7 +921,7 @@ function EvaluatingPhase({ evalId, agentName, numConversations, numExperts, onCo
             if (idx === schedule.length - 1) {
               timers.push(
                 setTimeout(
-                  () => onComplete({ ...DEMO_RESULT, timestamp: new Date().toISOString() }),
+                  () => onComplete({ ...(demoTool === "verimedia" ? DEMO_RESULT_VERIMEDIA : DEMO_RESULT), timestamp: new Date().toISOString() }),
                   700,
                 )
               );
@@ -1100,6 +1100,7 @@ export default function EvaluatorPage() {
   const [evalMeta, setEvalMeta] = useState({ agentName: "", numConversations: 0, numExperts: 0 });
   const [evalError, setEvalError] = useState(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoTool, setDemoTool] = useState(null);
 
   // On mount: check for ?demo= param to trigger demo mode
   useEffect(() => {
@@ -1107,6 +1108,7 @@ export default function EvaluatorPage() {
     if (demo) {
       setEvalMeta({ agentName: "WFP Support Bot", numConversations: 6, numExperts: 3 });
       setIsDemoMode(true);
+      setDemoTool(null);
       setPhase("evaluating");
     }
   }, []);
@@ -1132,16 +1134,22 @@ export default function EvaluatorPage() {
     }
   };
 
-  const handleDemoLoad = () => {
-    setEvalMeta({ agentName: "WFP Support Bot", numConversations: 6, numExperts: 3 });
+  const handleDemoLoad = (toolId) => {
+    const isVerimedia = toolId === "verimedia";
+    setEvalMeta({
+      agentName: isVerimedia ? "VeriMedia — AI Media Ethics Analyzer" : "WFP Support Bot",
+      numConversations: 6,
+      numExperts: 3,
+    });
     setIsDemoMode(true);
+    setDemoTool(toolId);
     setPhase("evaluating");
   };
 
   const handleComplete = (resultData) => {
     // Navigate to the dedicated results page
     if (isDemoMode) {
-      navigate("/results/demo");
+      navigate(demoTool === "verimedia" ? "/results/demo-verimedia" : "/results/demo");
     } else {
       navigate(`/results/${resultData.eval_id}`);
     }
@@ -1217,6 +1225,7 @@ export default function EvaluatorPage() {
             onComplete={handleComplete}
             onError={handleError}
             demoMode={isDemoMode}
+            demoTool={demoTool}
           />
         )}
 

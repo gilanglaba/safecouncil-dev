@@ -169,7 +169,7 @@ DEMO_INPUT = {
     ],
 }
 
-VERIMEDIIA_INPUT = {
+VERIMEDIA_INPUT = {
     "agent_name": "VeriMedia — AI Media Ethics Analyzer",
     "use_case": (
         "AI-powered media content analysis tool designed to help journalists, content creators, "
@@ -361,7 +361,7 @@ VERIMEDIIA_INPUT = {
 # Maps tool catalog IDs to their pre-built data (conversations included)
 CATALOG_DATA = {
     "wfp_support_bot": DEMO_INPUT,
-    "verimediia": VERIMEDIIA_INPUT,
+    "verimedia": VERIMEDIA_INPUT,
 }
 
 # Agent profiles for catalog tools WITHOUT pre-built conversations.

@@ -1,10 +1,17 @@
-.PHONY: setup run install-frontend run-frontend test clean
+.PHONY: setup run dev install-frontend run-frontend test clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 
-# Default target
+# Default target — run both backend and frontend
+dev: $(VENV)
+	@$(PYTHON) -c "import dotenv" 2>/dev/null || $(PIP) install -r backend/requirements.txt
+	@echo "Starting SafeCouncil (backend :5000 + frontend :3000)..."
+	@cd backend && ../$(PYTHON) app.py &
+	@sleep 2
+	@cd frontend && npm run dev
+
 run: $(VENV)
 	$(PYTHON) -c "import dotenv" 2>/dev/null || $(PIP) install -r backend/requirements.txt
 	cd backend && ../$(PYTHON) app.py

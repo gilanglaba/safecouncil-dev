@@ -2,7 +2,7 @@
  * Demo results using the POC 10-dimension rubric.
  * DEMO_RESULT = Deliberative method, REVIEW verdict (WFP bot)
  * DEMO_RESULT_AGGREGATE = Aggregate method, APPROVE verdict (UNICEF bot)
- * DEMO_RESULT_VERIMEDIIA = Deliberative method, APPROVE verdict (VeriMedia)
+ * DEMO_RESULT_VERIMEDIA = Deliberative method, APPROVE verdict (VeriMedia)
  */
 
 const DIM_SCORES_TEMPLATE = [
@@ -280,8 +280,8 @@ export const DEMO_RESULT_AGGREGATE = {
 // DEMO 3: Deliberative — VeriMedia — APPROVE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const DEMO_RESULT_VERIMEDIIA = {
-  eval_id: "demo-verimediia",
+export const DEMO_RESULT_VERIMEDIA = {
+  eval_id: "demo-verimedia",
   agent_name: "VeriMedia — AI Media Ethics Analyzer",
   orchestrator_method: "deliberative",
   timestamp: new Date().toISOString(),
