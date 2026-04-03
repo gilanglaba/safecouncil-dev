@@ -839,7 +839,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
             {submitting ? "Starting evaluation..." : "Run Council Evaluation →"}
           </button>
           <button
-            onClick={onDemoLoad}
+            onClick={() => onDemoLoad(selectedTool)}
             disabled={submitting}
             style={{
               fontSize: 14,
