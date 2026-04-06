@@ -1116,6 +1116,9 @@ export default function EvaluatorPage() {
   const handleSubmit = async (data) => {
     setSubmitting(true);
     setSubmitError(null);
+    // Track selected tool for demo fallback if evaluation fails
+    const toolId = data.api_config?.tool_id || null;
+    setDemoTool(toolId);
     try {
       const res = await api.submitEvaluation(data);
       setEvalId(res.eval_id);
@@ -1175,6 +1178,10 @@ export default function EvaluatorPage() {
       <main style={{ flex: 1, maxWidth: 1100, margin: "0 auto", width: "100%", padding: "40px 24px" }}>
 
         {/* Eval error state */}
+        {/* SafeCouncil handle case where API key is not set or invalid.
+            When evaluation fails (missing keys, invalid keys, rate limits, etc.),
+            we offer the user a demo result fallback so they can still see the
+            full evaluation pipeline output without requiring valid API credentials. */}
         {evalError && phase === "evaluating" && (
           <div
             style={{
@@ -1187,23 +1194,42 @@ export default function EvaluatorPage() {
             }}
           >
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Evaluation Failed</div>
-            <div style={{ fontSize: 14 }}>{evalError}</div>
-            <button
-              onClick={handleNewEvaluation}
-              style={{
-                marginTop: 12,
-                padding: "8px 16px",
-                background: theme.red,
-                color: "#fff",
-                border: "none",
-                borderRadius: theme.radiusFull,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Start Over
-            </button>
+            <div style={{ fontSize: 14, marginBottom: 4 }}>{evalError}</div>
+            <div style={{ fontSize: 13, color: theme.textSec, marginBottom: 12 }}>
+              This usually means API keys are not configured or invalid. You can still view a demo evaluation result.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => navigate(demoTool === "verimedia" ? "/results/demo-verimedia" : "/results/demo")}
+                style={{
+                  padding: "8px 16px",
+                  background: theme.violet,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: theme.radiusFull,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                See Demo Result Instead
+              </button>
+              <button
+                onClick={handleNewEvaluation}
+                style={{
+                  padding: "8px 16px",
+                  background: "transparent",
+                  color: theme.red,
+                  border: `1px solid ${theme.red}`,
+                  borderRadius: theme.radiusFull,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Start Over
+              </button>
+            </div>
           </div>
         )}
 
