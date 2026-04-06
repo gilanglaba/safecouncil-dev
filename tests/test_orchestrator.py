@@ -12,6 +12,7 @@ Expect 1-3 minutes per test depending on number of experts enabled.
 import sys
 import os
 import unittest
+import pytest
 
 # Allow imports from backend/
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "backend"))
@@ -54,6 +55,7 @@ def build_available_experts() -> list:
     return experts
 
 
+@pytest.mark.live_api
 class TestSimpleOrchestrator(unittest.TestCase):
 
     @classmethod

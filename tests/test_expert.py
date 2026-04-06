@@ -69,6 +69,9 @@ def get_minimal_input() -> EvaluationInput:
     return EvaluationInput.from_dict(mini)
 
 
+import pytest
+
+@pytest.mark.unit
 class TestExpertExtractJson(unittest.TestCase):
     """Test the JSON extraction utility (no API calls needed)."""
 
@@ -107,6 +110,7 @@ class TestExpertExtractJson(unittest.TestCase):
             BaseExpert.extract_json("")
 
 
+@pytest.mark.live_api
 class TestExpertEvaluation(unittest.TestCase):
     """Integration tests with real LLM API calls."""
 
@@ -171,6 +175,7 @@ class TestExpertEvaluation(unittest.TestCase):
         self.assertIsInstance(data, dict)
 
 
+@pytest.mark.unit
 class TestGovernanceContext(unittest.TestCase):
     """Test governance framework text retrieval."""
 

@@ -16,6 +16,7 @@ import os
 import time
 import json
 import unittest
+import pytest
 
 # Allow running from project root
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -46,6 +47,7 @@ def wait_for_completion(eval_id: str, timeout: int = 300, poll_interval: int = 2
     raise TimeoutError(f"Evaluation {eval_id} did not complete within {timeout} seconds")
 
 
+@pytest.mark.integration
 class TestHealthEndpoint(unittest.TestCase):
     """Test /api/health"""
 
@@ -67,6 +69,7 @@ class TestHealthEndpoint(unittest.TestCase):
             self.assertIn("available", experts[provider])
 
 
+@pytest.mark.integration
 class TestFrameworksEndpoint(unittest.TestCase):
     """Test /api/frameworks"""
 
@@ -93,6 +96,7 @@ class TestFrameworksEndpoint(unittest.TestCase):
             self.assertIn("default", fw)
 
 
+@pytest.mark.integration
 class TestEvaluationSubmission(unittest.TestCase):
     """Test POST /api/evaluate"""
 
@@ -144,6 +148,7 @@ class TestEvaluationSubmission(unittest.TestCase):
         self.assertEqual(resp.status_code, 400)
 
 
+@pytest.mark.integration
 class TestStatusPolling(unittest.TestCase):
     """Test GET /api/evaluate/{id}/status"""
 
@@ -182,6 +187,7 @@ class TestStatusPolling(unittest.TestCase):
         print(f"\n  Eval ID: {eval_id}, Initial status: {status_data['status']}")
 
 
+@pytest.mark.integration
 class TestResultRetrieval(unittest.TestCase):
     """Test GET /api/evaluate/{id} and full end-to-end flow."""
 
@@ -261,6 +267,7 @@ class TestResultRetrieval(unittest.TestCase):
         print(f"  Cost: ${audit.get('total_cost_usd', 0):.4f}")
 
 
+@pytest.mark.integration
 class TestEvaluationsList(unittest.TestCase):
     """Test GET /api/evaluations"""
 

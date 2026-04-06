@@ -1,4 +1,4 @@
-.PHONY: setup run dev install-frontend run-frontend test test-api clean
+.PHONY: setup run dev install-frontend run-frontend test test-api test-all clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -36,13 +36,17 @@ install-frontend:
 run-frontend:
 	cd frontend && npm run dev
 
-# Unit tests only (no live server required)
+# Unit tests only — safe to run without server or API keys (default via pytest.ini)
 test: $(VENV)
-	cd backend && ../$(PYTHON) -m pytest ../tests/test_expert.py -v
+	PYTHONPATH=backend $(PYTHON) -m pytest -v
 
-# Integration tests (requires live server on localhost:5000)
+# Integration tests — requires live Flask server on localhost:5000
 test-api: $(VENV)
-	cd backend && ../$(PYTHON) -m pytest ../tests/test_api.py -v
+	PYTHONPATH=backend $(PYTHON) -m pytest -m integration -v
+
+# All tests including live API calls — requires server + API keys
+test-all: $(VENV)
+	PYTHONPATH=backend $(PYTHON) -m pytest -m "" -v
 
 clean:
 	rm -rf $(VENV) __pycache__ backend/__pycache__ .pytest_cache
