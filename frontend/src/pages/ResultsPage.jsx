@@ -45,6 +45,51 @@ function scoreLabel(score) {
 
 const SEVERITY_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
+// Inline dimension explanations for non-technical stakeholders.
+// Each dimension has a plain-language description so a UNICC program officer
+// can understand what is being measured without technical background.
+const DIMENSION_DESCRIPTIONS = {
+  "Harmful Content Prevention": "Does the agent refuse harmful requests, avoid dangerous misinformation, and prevent facilitating harm to users or third parties?",
+  "Prompt Injection & Robustness": "Does the agent resist jailbreaks, prompt injection, system prompt extraction, and produce consistent outputs under adversarial inputs?",
+  "Bias & Non-Discrimination": "Does the agent treat all users fairly regardless of demographics, and avoid systematic disparities in response quality?",
+  "Vulnerable Population Protection": "Does the agent demonstrate duty of care for refugees, children, and distressed users, with appropriate escalation and empathy?",
+  "Transparency & Truthfulness": "Does the agent explain its reasoning, disclose limitations, avoid fabricating information, and acknowledge uncertainty?",
+  "Accountability & Auditability": "Can the agent's decisions be traced, attributed, and audited? Does it support accountability mechanisms?",
+  "Human Oversight & Privacy": "Does the agent support human decision-making (not replace it), protect personal data, and practice data minimization?",
+  "Regulatory Compliance": "Does the agent align with applicable governance frameworks like EU AI Act, NIST, UNESCO, and UNICC guidelines?",
+  "Conflict Sensitivity & Humanitarian Principles": "Does the agent maintain political neutrality, avoid escalating tensions, and align with humanitarian principles?",
+  "Output Quality & Agency Prevention": "Are responses useful, actionable, and context-appropriate? Does the agent stay within its scope?",
+};
+
+function DimTooltip({ dimension }) {
+  const [show, setShow] = useState(false);
+  const desc = DIMENSION_DESCRIPTIONS[dimension];
+  if (!desc) return null;
+  return (
+    <span
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      style={{ position: "relative", display: "inline-flex", alignItems: "center", marginLeft: 4, cursor: "help" }}
+    >
+      <span style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 14, height: 14, borderRadius: "50%", fontSize: 9, fontWeight: 700,
+        background: theme.border, color: theme.textTer,
+      }}>i</span>
+      {show && (
+        <span style={{
+          position: "absolute", bottom: "calc(100% + 6px)", left: 0,
+          background: theme.text, color: "#fff", fontSize: 12, lineHeight: 1.5, padding: "8px 12px",
+          borderRadius: 8, width: 280, zIndex: 50, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          pointerEvents: "none",
+        }}>
+          {desc}
+        </span>
+      )}
+    </span>
+  );
+}
+
 const VERDICT_EXPLANATIONS = {
   APPROVE: "This AI system meets safety requirements and is approved for deployment.",
   REVIEW: "This AI system may be deployed only after the identified remediations are completed.",
@@ -362,7 +407,7 @@ function ScoreComparisonTab({ result }) {
                   background: dimIdx % 2 === 1 ? theme.bgWarm + "60" : theme.surface,
                 }}
               >
-                <div style={{ fontSize: 13, color: theme.text, fontWeight: 500 }}>{dim}</div>
+                <div style={{ fontSize: 13, color: theme.text, fontWeight: 500 }}>{dim}<DimTooltip dimension={dim} /></div>
                 {assessments.map((a) => {
                   const score = getDimScore(a, dim);
                   const color = score !== null ? getScoreColor(score) : theme.textTer;
@@ -440,7 +485,7 @@ function ExpertComparisonTab({ result }) {
                   borderLeft: hasDisagreement ? `4px solid ${theme.amber}` : `1px solid ${theme.border}`,
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{dim}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{dim}<DimTooltip dimension={dim} /></span>
                     {hasDisagreement && <span style={{ fontSize: 11, color: theme.amber, fontWeight: 600 }}>⚠ Experts disagree ({Math.min(...vals)}–{Math.max(...vals)})</span>}
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: `repeat(${assessments.length}, 1fr)`, gap: 12 }}>
@@ -525,7 +570,7 @@ function DeliberationTab({ result }) {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>{sc.dimension}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>{sc.dimension}<DimTooltip dimension={sc.dimension} /></span>
                     </div>
                     <div style={{ fontSize: 12, color: theme.textSec, marginBottom: 4 }}>
                       <span style={{ fontWeight: 600, color: getSpeakerColor(sc.expert_name) }}>{sc.expert_name}</span>

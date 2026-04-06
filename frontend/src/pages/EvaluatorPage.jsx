@@ -346,6 +346,9 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
           evaluation with cross-critique and deliver an <strong>APPROVE</strong>, <strong>REVIEW</strong>,
           or <strong>REJECT</strong> verdict with actionable recommendations.
         </p>
+        <p style={{ fontSize: 12, color: theme.textTer, margin: "8px 0 0", lineHeight: 1.5 }}>
+          No API keys? Use the <strong>Test Demo</strong> button to see a full evaluation without any setup.
+        </p>
       </div>
 
       {/* ── SECTION 1: Choose a Tool ──────────────────────────────────────── */}
