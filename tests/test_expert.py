@@ -31,30 +31,31 @@ from demo_data import DEMO_INPUT
 
 def get_test_expert():
     """Instantiate the test expert based on environment configuration."""
-    provider = os.getenv("TEST_EXPERT", "claude").lower()
+    from experts.expert import Expert
+    from experts.llm_providers import ProviderRegistry
+    from dimensions.loader import load_all_dimensions
 
-    if provider == "claude" and Config.ANTHROPIC_API_KEY:
-        from experts.claude_expert import ClaudeExpert
-        return ClaudeExpert(
-            name=Config.EXPERT_A_NAME,
-            api_key=Config.ANTHROPIC_API_KEY,
-            model=Config.CLAUDE_MODEL,
-        )
-    elif provider == "gpt4o" and Config.OPENAI_API_KEY:
-        from experts.openai_expert import OpenAIExpert
-        return OpenAIExpert(
-            name=Config.EXPERT_B_NAME,
-            api_key=Config.OPENAI_API_KEY,
-            model=Config.OPENAI_MODEL,
-        )
-    elif provider == "gemini" and Config.GOOGLE_API_KEY:
-        from experts.gemini_expert import GeminiExpert
-        return GeminiExpert(
-            name=Config.EXPERT_C_NAME,
-            api_key=Config.GOOGLE_API_KEY,
-            model=Config.GEMINI_MODEL,
-        )
-    else:
+    provider = os.getenv("TEST_EXPERT", "claude").lower()
+    registry = ProviderRegistry()
+
+    provider_map = {
+        "claude": ("claude", Config.ANTHROPIC_API_KEY, Config.EXPERT_A_NAME),
+        "gpt4o": ("gpt4o", Config.OPENAI_API_KEY, Config.EXPERT_B_NAME),
+        "gemini": ("gemini", Config.GOOGLE_API_KEY, Config.EXPERT_C_NAME),
+    }
+
+    if provider not in provider_map:
+        return None
+
+    key, api_key, name = provider_map[provider]
+    if not api_key:
+        return None
+
+    try:
+        llm_provider = registry.create(key)
+        dimensions = load_all_dimensions()
+        return Expert(name=name, provider=llm_provider, dimensions=dimensions)
+    except Exception:
         return None
 
 

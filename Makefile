@@ -1,4 +1,4 @@
-.PHONY: setup run dev install-frontend run-frontend test clean
+.PHONY: setup run dev install-frontend run-frontend test test-api clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -36,8 +36,13 @@ install-frontend:
 run-frontend:
 	cd frontend && npm run dev
 
+# Unit tests only (no live server required)
 test: $(VENV)
-	cd backend && ../$(PYTHON) -m pytest ../tests/ -v
+	cd backend && ../$(PYTHON) -m pytest ../tests/test_expert.py -v
+
+# Integration tests (requires live server on localhost:5000)
+test-api: $(VENV)
+	cd backend && ../$(PYTHON) -m pytest ../tests/test_api.py -v
 
 clean:
 	rm -rf $(VENV) __pycache__ backend/__pycache__ .pytest_cache

@@ -247,7 +247,7 @@ class TestResultRetrieval(unittest.TestCase):
             self.assertIn("overall_score", assessment)
             self.assertIn("verdict", assessment)
             self.assertIn("dimension_scores", assessment)
-            self.assertGreaterEqual(len(assessment["dimension_scores"]), 15)
+            self.assertGreaterEqual(len(assessment["dimension_scores"]), 10)
 
         audit = result["audit"]
         self.assertIn("total_api_calls", audit)

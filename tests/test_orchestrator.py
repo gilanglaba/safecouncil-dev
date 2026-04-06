@@ -29,19 +29,27 @@ from demo_data import DEMO_INPUT
 
 def build_available_experts() -> list:
     """Build list of expert instances for all configured API keys."""
+    from experts.expert import Expert
+    from experts.llm_providers import ProviderRegistry
+    from dimensions.loader import load_all_dimensions
+
+    registry = ProviderRegistry()
+    dimensions = load_all_dimensions()
     experts = []
 
-    if Config.ANTHROPIC_API_KEY:
-        from experts.claude_expert import ClaudeExpert
-        experts.append(ClaudeExpert(Config.EXPERT_A_NAME, Config.ANTHROPIC_API_KEY, Config.CLAUDE_MODEL))
+    providers = [
+        ("claude", Config.ANTHROPIC_API_KEY, Config.EXPERT_A_NAME),
+        ("gpt4o", Config.OPENAI_API_KEY, Config.EXPERT_B_NAME),
+        ("gemini", Config.GOOGLE_API_KEY, Config.EXPERT_C_NAME),
+    ]
 
-    if Config.OPENAI_API_KEY:
-        from experts.openai_expert import OpenAIExpert
-        experts.append(OpenAIExpert(Config.EXPERT_B_NAME, Config.OPENAI_API_KEY, Config.OPENAI_MODEL))
-
-    if Config.GOOGLE_API_KEY:
-        from experts.gemini_expert import GeminiExpert
-        experts.append(GeminiExpert(Config.EXPERT_C_NAME, Config.GOOGLE_API_KEY, Config.GEMINI_MODEL))
+    for key, api_key, name in providers:
+        if api_key:
+            try:
+                llm_provider = registry.create(key)
+                experts.append(Expert(name=name, provider=llm_provider, dimensions=dimensions))
+            except Exception:
+                pass
 
     return experts
 
