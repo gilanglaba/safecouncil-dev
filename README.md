@@ -14,26 +14,27 @@ Live demo: [safecouncil.vercel.app](https://safecouncil.vercel.app)
 
 ## Quick Start
 
-**Prerequisites:** Python 3.11+, Node.js 18+, at least one API key (Anthropic, OpenAI, or Google).
+**Prerequisites:** Python 3.11+, Node.js 18+. API keys are optional — without them, you can still run the **Test Demo** for a full evaluation walkthrough.
 
-### With Makefile
+### One-command (Makefile)
 
 ```bash
-# 1. Setup backend (creates venv, installs deps, copies .env)
+# 1. Install backend deps + create .env from template
 make setup
 
-# 2. Edit backend/.env and add your API keys
+# 2. (Optional) Edit backend/.env and add your API keys
 #    ANTHROPIC_API_KEY=sk-ant-...
 #    OPENAI_API_KEY=sk-proj-...
 #    GOOGLE_API_KEY=AIza...
 
-# 3. Run backend (port 5000)
-make run
-
-# 4. In a separate terminal — setup and run frontend (port 3000)
+# 3. Install frontend deps
 make install-frontend
-make run-frontend
+
+# 4. Start backend + frontend together
+make dev
 ```
+
+`make dev` runs the backend in the background and the frontend in the foreground. Open http://localhost:3000.
 
 ### Manual
 
@@ -241,9 +242,11 @@ safecouncil/
 │   ├── public/                         # Static assets (favicon, photos)
 │   └── package.json
 ├── tests/
-│   ├── test_expert.py
-│   ├── test_orchestrator.py
-│   └── test_api.py
+│   ├── conftest.py                     # PYTHONPATH setup + test categorization docs
+│   ├── test_expert.py                  # Unit tests + live API expert tests
+│   ├── test_orchestrator.py            # Live API orchestrator tests
+│   └── test_api.py                     # Integration tests (require live server)
+├── pytest.ini                          # Test markers (unit/integration/live_api)
 ├── Makefile
 └── README.md
 ```
@@ -287,11 +290,16 @@ The system automatically adapts: compact prompts, reduced token limits, extended
 
 ## Running Tests
 
-```bash
-make test
+Tests are organized by category using pytest markers:
 
-# Or manually:
-cd backend && python -m pytest ../tests/ -v
+- **Unit tests** — no API calls, no live server required
+- **Integration tests** — require Flask server running on `localhost:5000`
+- **Live API tests** — make real LLM API calls (require API keys, costs money)
+
+```bash
+make test          # Unit tests only (default — runs out of the box)
+make test-api      # Integration tests (start backend first with `make run`)
+make test-all      # All tests including live API calls
 ```
 
 ---
@@ -300,11 +308,14 @@ cd backend && python -m pytest ../tests/ -v
 
 | Target | Description |
 |--------|-------------|
+| `make dev` | **Default** — start backend (:5000) + frontend (:3000) |
 | `make setup` | Create venv, install deps, copy .env.example |
-| `make run` | Start backend server (default target) |
+| `make run` | Start backend server only |
 | `make install-frontend` | Install frontend dependencies |
-| `make run-frontend` | Start frontend dev server |
-| `make test` | Run pytest |
+| `make run-frontend` | Start frontend dev server only |
+| `make test` | Run unit tests (no server, no API keys needed) |
+| `make test-api` | Run integration tests (requires live server) |
+| `make test-all` | Run all tests (requires server + API keys) |
 | `make clean` | Remove venv and cache files |
 
 ---
