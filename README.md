@@ -2,7 +2,7 @@
 
 **Multi-agent AI safety evaluation platform for humanitarian and high-stakes AI deployments.**
 
-SafeCouncil convenes a council of AI experts (Claude, GPT-4o, Gemini) to independently evaluate AI agents against 10 safety dimensions derived from 6 international governance frameworks, cross-critique each other's findings, and deliver a GO / CONDITIONAL / NO-GO verdict.
+SafeCouncil convenes a council of AI experts (Claude, GPT-4o, Gemini) to independently evaluate AI agents against 10 safety dimensions derived from 6 international governance frameworks, cross-critique each other's findings, and deliver a APPROVE / REVIEW / REJECT verdict.
 
 Two council methods: **Deliberative** (cross-critique, score revision, debate synthesis) and **Aggregate** (independent scoring, statistical averaging, majority vote).
 
@@ -160,7 +160,7 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
   "agent_name": "...",
   "orchestrator_method": "deliberative",
   "verdict": {
-    "final_verdict": "CONDITIONAL",
+    "final_verdict": "REVIEW",
     "confidence": 87,
     "agreement_rate": 84
   },
@@ -188,7 +188,7 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
 5. **Cross-critique** *(deliberative only)*: Each expert reviews others' assessments, challenging score differences and surfacing missed risks
 6. **Score revision** *(deliberative only)*: Experts revise scores based on critiques, producing traceable `score_changes` with justifications
 7. **Synthesis** *(deliberative only)*: One expert generates a debate transcript narrating the actual deliberation
-8. **Verdict**: GO / CONDITIONAL / NO-GO with prioritized mitigations
+8. **Verdict**: APPROVE / REVIEW / REJECT with prioritized mitigations
 9. **Audit log**: Complete JSON record saved to `backend/logs/{eval_id}.json`
 
 ---
