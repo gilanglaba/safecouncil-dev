@@ -1,5 +1,11 @@
+# SafeCouncil is able to run synthesis pipeline without requiring a live API key.
+# When Config.DEMO_MODE is enabled (auto-detected when all 3 LLM keys are missing,
+# or explicitly set), evaluation requests bypass LLM calls and return a pre-built
+# deliberative result through this same EvaluationService code path. See
+# Config.DEMO_MODE in backend/config.py and _run_demo_evaluation() below.
 import logging
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Optional
@@ -194,6 +200,16 @@ class EvaluationService:
 
         try:
             job.status = EvalStatus.RUNNING
+
+            # ── DEMO MODE SHORT-CIRCUIT ──────────────────────────────────────
+            # SafeCouncil is able to run synthesis pipeline without requiring a
+            # live API key. When DEMO_MODE is on (auto-detected when all 3 LLM
+            # keys are missing, or explicitly set), the backend executes the full
+            # evaluation lifecycle (job tracking, status polling, audit logging)
+            # but bypasses LLM calls and returns a pre-built deliberative result.
+            if Config.DEMO_MODE:
+                self._run_demo_evaluation(eval_id, eval_input)
+                return
 
             # ── CATALOG LOOKUP (pre-loaded tool data) ────────────────────────
             if is_probe:
@@ -416,6 +432,76 @@ class EvaluationService:
             job.status = EvalStatus.FAILED
             job.error = str(e)
             job.current_step = "Evaluation failed"
+
+    def _run_demo_evaluation(self, eval_id: str, eval_input: EvaluationInput):
+        """
+        SafeCouncil is able to run synthesis pipeline without requiring a live API key.
+        This method is the demo branch — it executes the full job lifecycle (status
+        polling, audit logging, result retrieval) but bypasses LLM calls and returns
+        a pre-built deliberative result. Used when Config.DEMO_MODE is enabled.
+
+        Total simulated step delays are capped at ~3 seconds.
+        """
+        job = self.jobs[eval_id]
+        from demo_data import DEMO_RESULT_WFP, DEMO_RESULT_VERIMEDIA
+        import copy
+
+        # Choose which pre-built result to use based on input
+        api_config = eval_input.api_config or {}
+        tool_id = api_config.get("tool_id", "")
+        github_url = (api_config.get("github_url") or "").lower()
+        agent_name_lower = (eval_input.agent_name or "").lower()
+
+        is_verimedia = (
+            tool_id == "verimedia"
+            or "verimedia" in github_url
+            or "verimedia" in agent_name_lower
+        )
+        template = DEMO_RESULT_VERIMEDIA if is_verimedia else DEMO_RESULT_WFP
+
+        # Walk through evaluation steps with capped total sleep (~2.8s)
+        steps_count = max(1, len(job.steps))
+        sleep_per_step = min(0.4, 2.8 / steps_count)
+
+        for i in range(steps_count):
+            self._update_step(
+                job, i, "running",
+                f"Demo mode: {job.steps[i].step}...",
+                int((i / steps_count) * 90),
+            )
+            time.sleep(sleep_per_step)
+            self._update_step(
+                job, i, "complete",
+                f"Demo mode: {job.steps[i].step} complete",
+                int(((i + 1) / steps_count) * 90),
+            )
+
+        # Build final result dict from template, overriding identity fields
+        result = copy.deepcopy(template)
+        result["eval_id"] = eval_id
+        result["agent_name"] = eval_input.agent_name or template["agent_name"]
+        result["timestamp"] = datetime.now(timezone.utc).isoformat()
+        result["orchestrator_method"] = (
+            getattr(eval_input, "orchestration_method", None) or "deliberative"
+        )
+
+        # Save audit log so /api/evaluate/{id} returns the same shape as a real eval
+        try:
+            import os
+            import json as _json
+            os.makedirs(Config.LOG_DIR, exist_ok=True)
+            log_path = os.path.join(Config.LOG_DIR, f"{eval_id}.json")
+            with open(log_path, "w", encoding="utf-8") as f:
+                _json.dump(result, f, indent=2, ensure_ascii=False)
+            logger.info(f"[{eval_id}] [DEMO] Audit log saved to {log_path}")
+        except Exception as e:
+            logger.warning(f"[{eval_id}] [DEMO] Failed to save audit log: {e}")
+
+        job.result = result
+        job.status = EvalStatus.COMPLETE
+        job.progress = 100
+        job.current_step = "Demo evaluation complete"
+        logger.info(f"[{eval_id}] [DEMO] Pipeline complete: verdict={result['verdict']['final_verdict']}")
 
     def _create_experts(self, eval_input: EvaluationInput) -> list:
         """

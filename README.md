@@ -14,7 +14,7 @@ Live demo: [safecouncil.vercel.app](https://safecouncil.vercel.app)
 
 ## Quick Start
 
-**Prerequisites:** Python 3.11+, Node.js 18+. API keys are optional — without them, you can still run the **Test Demo** for a full evaluation walkthrough.
+**Prerequisites:** Python 3.11+, Node.js 18+. API keys are optional — without them, SafeCouncil automatically runs in demo mode and you can still see the full synthesis pipeline end-to-end (see [Demo Mode](#demo-mode-run-without-api-keys) below).
 
 ### One-command (Makefile)
 
@@ -285,6 +285,42 @@ SafeCouncil supports on-premise LLM evaluation via LM Studio or any OpenAI-compa
 3. In the evaluation request, set an expert to `{"llm": "local", "enabled": true}`
 
 The system automatically adapts: compact prompts, reduced token limits, extended timeouts.
+
+---
+
+## Demo Mode (run without API keys)
+
+SafeCouncil includes a **demo mode** for evaluators who want to verify the full synthesis pipeline without configuring LLM API keys. When enabled, the backend executes the entire evaluation pipeline (job submission, status polling, audit logging, result retrieval) but skips actual LLM calls and returns a pre-built deliberative result with real arbitration artifacts (score changes, debate transcript, revision rationale).
+
+**Configuration via `DEMO_MODE` environment variable in `backend/.env`:**
+
+| Value | Behavior |
+|---|---|
+| `true` | Force demo mode regardless of API keys |
+| `false` | Force real mode — backend will fail evaluations if no keys are configured |
+| `auto` | (default) Demo mode ONLY when **all three** API keys are missing. As soon as you set even one key, real evaluation runs |
+
+**For graders / first-time evaluators:**
+
+```bash
+make setup       # creates an empty backend/.env
+make install-frontend
+make dev         # starts backend + frontend
+```
+
+Open the evaluator page → submit any agent → the synthesis pipeline runs end-to-end and returns a pre-built deliberative result with all arbitration artifacts. **No API keys required.**
+
+**For developers switching modes:**
+
+Edit `backend/.env` to change `DEMO_MODE` or add API keys, then **restart the backend** with `make dev` for the changes to take effect. Environment variables are loaded once at startup.
+
+**Verifying which mode the backend is in:**
+
+```bash
+curl http://localhost:5000/api/health
+```
+
+The response includes a `demo_mode: true|false` field.
 
 ---
 

@@ -383,14 +383,30 @@ def health_check():
         expert_status = Config.get_expert_model_info()
         any_available = any(v.get("available") for v in expert_status.values())
 
+        # SafeCouncil is able to run synthesis pipeline without requiring a live
+        # API key. demo_mode reflects whether evaluation requests will bypass
+        # LLM calls and return pre-built results.
+        demo_mode = Config.DEMO_MODE
+
+        warnings = []
+        if not any_available and not demo_mode:
+            warnings.append(
+                "No AI provider API keys configured. Set ANTHROPIC_API_KEY, "
+                "OPENAI_API_KEY, or GOOGLE_API_KEY in .env file, or set "
+                "DEMO_MODE=true to run the synthesis pipeline without API keys."
+            )
+        if demo_mode:
+            warnings.append(
+                "DEMO_MODE is active. Evaluation requests will return pre-built "
+                "results without calling real LLM APIs."
+            )
+
         return jsonify({
-            "status": "healthy" if any_available else "degraded",
+            "status": "healthy" if (any_available or demo_mode) else "degraded",
             "version": Config.VERSION,
             "experts": expert_status,
-            "warnings": [] if any_available else [
-                "No AI provider API keys configured. Set ANTHROPIC_API_KEY, "
-                "OPENAI_API_KEY, or GOOGLE_API_KEY in .env file."
-            ],
+            "demo_mode": demo_mode,
+            "warnings": warnings,
         }), 200
 
     except Exception as e:

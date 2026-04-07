@@ -15,6 +15,35 @@ class Config:
     DEBUG = os.getenv("FLASK_DEBUG", "true").lower() == "true"
     HOST = os.getenv("HOST", "0.0.0.0")
 
+    # ── SafeCouncil DEMO_MODE ────────────────────────────────────────────────
+    # SafeCouncil is able to run synthesis pipeline without requiring a live
+    # API key. When DEMO_MODE is enabled, evaluation requests bypass LLM calls
+    # and return a pre-built deliberative result through the real backend code
+    # path (job tracking, status polling, audit logging all execute normally).
+    #
+    # Three-state DEMO_MODE environment variable:
+    #   "true"  → force demo mode regardless of API keys
+    #   "false" → force real mode (will fail if no keys are set)
+    #   "auto"  → demo mode ONLY when ALL three API keys are missing (default)
+    #
+    # Cached at module import — restart the backend after editing .env to apply.
+    @staticmethod
+    def _compute_demo_mode():
+        mode = os.getenv("DEMO_MODE", "auto").lower().strip()
+        if mode == "true":
+            return True
+        if mode == "false":
+            return False
+        # auto: enable demo only when ALL three LLM keys are missing
+        no_keys = not (
+            os.getenv("ANTHROPIC_API_KEY", "").strip()
+            or os.getenv("OPENAI_API_KEY", "").strip()
+            or os.getenv("GOOGLE_API_KEY", "").strip()
+        )
+        return no_keys
+
+    DEMO_MODE = _compute_demo_mode.__func__()
+
     # Models
     CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
