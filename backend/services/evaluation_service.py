@@ -262,10 +262,13 @@ class EvaluationService:
                             anthropic_api_key=Config.ANTHROPIC_API_KEY,
                             model=Config.CLAUDE_MODEL,
                         )
+                        # Use interface-appropriate probes from the extracted profile
+                        # (e.g., content snippets for a content analyzer, not chatbot questions)
                         conversations = probe.simulate_agent_batch(
                             agent_system_prompt=profile["system_prompt"],
                             use_case=profile["use_case"],
                             probe_count=10,
+                            custom_probes=profile.get("test_probes") or None,
                         )
                         eval_input.conversations = conversations
                         eval_input.agent_name = profile["agent_name"]
@@ -276,7 +279,7 @@ class EvaluationService:
                         is_probe = False
                         step_offset = 0
                         self._update_step(job, 0, "complete", f"Loaded {len(conversations)} conversations", 10)
-                        logger.info(f"[{eval_id}] GitHub ingestion complete: {profile['agent_name']} (cached={was_cached})")
+                        logger.info(f"[{eval_id}] GitHub ingestion complete: {profile['agent_name']} ({profile.get('interface_type', '?')}, cached={was_cached})")
                     except Exception as e:
                         logger.error(f"[{eval_id}] GitHub ingestion failed: {e}")
                         self._update_step(job, 0, "failed", f"GitHub ingestion failed: {e}", 5)
