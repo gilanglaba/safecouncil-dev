@@ -358,10 +358,17 @@ VERIMEDIA_INPUT = {
     ],
 }
 
-# Maps tool catalog IDs to their pre-built data (conversations included)
+# Maps tool catalog IDs to their pre-built data (conversations included).
+# Used as instant-demo path when no GitHub URL is available for the tool.
 CATALOG_DATA = {
     "wfp_support_bot": DEMO_INPUT,
-    "verimedia": VERIMEDIA_INPUT,
+}
+
+# Maps tool catalog IDs to their public GitHub URL.
+# When a tool has a GitHub URL, selecting it from the catalog routes through
+# the dynamic GitHub ingestion pipeline (real source code analysis).
+CATALOG_GITHUB_URLS = {
+    "verimedia": "https://github.com/FlashCarrot/VeriMedia",
 }
 
 # Agent profiles for catalog tools WITHOUT pre-built conversations.

@@ -200,8 +200,13 @@ class EvaluationService:
                 api_config = eval_input.api_config or {}
                 tool_id = api_config.get("tool_id")
                 if tool_id:
-                    from demo_data import CATALOG_DATA, CATALOG_PROFILES
-                    if tool_id in CATALOG_DATA:
+                    from demo_data import CATALOG_DATA, CATALOG_PROFILES, CATALOG_GITHUB_URLS
+                    # If catalog tool has a GitHub URL, route through dynamic ingestion
+                    if tool_id in CATALOG_GITHUB_URLS:
+                        api_config["github_url"] = CATALOG_GITHUB_URLS[tool_id]
+                        eval_input.api_config = api_config
+                        logger.info(f"[{eval_id}] Catalog tool '{tool_id}' routed to GitHub URL: {api_config['github_url']}")
+                    elif tool_id in CATALOG_DATA:
                         # Pre-loaded conversations — no API call needed
                         catalog_entry = CATALOG_DATA[tool_id]
                         eval_input.conversations = [
