@@ -106,25 +106,70 @@ export default function LandingPage() {
           <h1
             style={{
               fontFamily: theme.fontSerif,
-              fontSize: "clamp(40px, 6vw, 68px)",
-              fontWeight: 400,
-              lineHeight: 1.08,
+              fontSize: "clamp(44px, 7vw, 80px)",
+              fontWeight: 500,
+              lineHeight: 0.95,
+              letterSpacing: "-0.03em",
               color: theme.text,
-              marginBottom: 24,
+              marginBottom: 20,
             }}
           >
-            AI safety evaluation,{" "}
             <span
               style={{
                 background: "linear-gradient(135deg, #57068C 0%, #5B92E5 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
-                fontStyle: "italic",
               }}
             >
-              reimagined
+              SafeCouncil
             </span>
           </h1>
+          <div
+            style={{
+              fontFamily: theme.fontSerif,
+              fontSize: "clamp(22px, 3vw, 32px)",
+              fontWeight: 400,
+              lineHeight: 1.25,
+              letterSpacing: "-0.01em",
+              color: theme.text,
+              marginBottom: 12,
+            }}
+          >
+            Multi-agent AI Safety Evaluation Tool and Framework
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              justifyContent: "center",
+              marginBottom: 28,
+            }}
+          >
+            {[
+              "Research-grounded",
+              "Future-proof",
+              "Built on-premises for the UN",
+            ].map((label) => (
+              <span
+                key={label}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "6px 14px",
+                  borderRadius: theme.radiusFull,
+                  background: theme.violetPale,
+                  border: `1px solid ${theme.violetBorder}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: theme.violet,
+                  letterSpacing: "0.01em",
+                }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
 
           <p
             style={{

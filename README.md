@@ -193,6 +193,23 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
 
 ---
 
+## Input Methods
+
+SafeCouncil accepts AI agents through four input modes — pick whichever matches what you have:
+
+| Mode | What you provide | Best for |
+|---|---|---|
+| **1. Tool Catalog** | Click a pre-loaded agent (WFP Support Bot, VeriMedia, UNICEF/UNHCR/WHO simulations) | Demo users who want to see the full pipeline immediately |
+| **2. GitHub Repo URL** | Paste any public GitHub URL — SafeCouncil fetches the README + code, extracts an agent profile via Claude, and generates interface-appropriate test probes | Open-source AI agents, dynamic evaluation |
+| **3. Connect API** | A live HTTPS endpoint + auth header — SafeCouncil sends real probes to your running agent | Agents already deployed in staging/production |
+| **4. Upload Files** | A JSON or CSV of conversation pairs (`prompt` / `output`) | Offline transcript analysis, batch evaluations |
+
+**Try VeriMedia**: from the Tool Catalog, click **VeriMedia** — it routes to [github.com/FlashCarrot/VeriMedia](https://github.com/FlashCarrot/VeriMedia) and runs a full deliberative evaluation against the live repo. VeriMedia is a Flask-based AI media ethics analyzer with a GPT-4o backend; SafeCouncil's report specifically calls out its file upload surface and missing authentication layer as deployment-blocking findings.
+
+**Try GitHub URL ingestion**: under **GitHub Repo**, paste any public AI-agent repo URL — for example, try VeriMedia at [https://github.com/FlashCarrot/VeriMedia](https://github.com/FlashCarrot/VeriMedia). SafeCouncil ingests the README + code, infers the agent's interface (chat / API / file processor), generates appropriate test probes, and runs them against a Claude-simulated version of the agent — no live deployment required.
+
+---
+
 ## Project Structure
 
 ```
