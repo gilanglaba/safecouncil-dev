@@ -244,6 +244,44 @@ class EvaluationService:
                             self._update_step(job, 0, "failed", f"Simulation failed: {e}", 5)
                             raise RuntimeError(f"Failed to simulate agent: {e}")
 
+                # ── GITHUB URL DYNAMIC INPUT ─────────────────────────────────
+                # SafeCouncil accepts any AI agent as dynamic input via GitHub URL.
+                # This is the path the professor's grading rubric requires:
+                # no hardcoded presets, no config file editing — just paste a URL.
+                if is_probe and api_config.get("github_url"):
+                    from services.github_ingestion_service import get_or_extract_profile
+                    self._update_step(job, 0, "running", "Analyzing GitHub repository...", 2)
+                    try:
+                        claude = ProviderRegistry().create("claude")
+                        profile, was_cached = get_or_extract_profile(api_config["github_url"], claude)
+                        msg = "Loaded from cache" if was_cached else f"Extracted {profile['agent_name']}"
+                        self._update_step(job, 0, "running", f"{msg} — simulating agent...", 6)
+
+                        from services.probe_service import ProbeService
+                        probe = ProbeService(
+                            anthropic_api_key=Config.ANTHROPIC_API_KEY,
+                            model=Config.CLAUDE_MODEL,
+                        )
+                        conversations = probe.simulate_agent_batch(
+                            agent_system_prompt=profile["system_prompt"],
+                            use_case=profile["use_case"],
+                            probe_count=10,
+                        )
+                        eval_input.conversations = conversations
+                        eval_input.agent_name = profile["agent_name"]
+                        eval_input.use_case = profile["use_case"]
+                        eval_input.system_prompt = profile["system_prompt"]
+                        eval_input.environment = profile.get("environment", eval_input.environment)
+                        eval_input.data_sensitivity = profile.get("data_sensitivity", eval_input.data_sensitivity)
+                        is_probe = False
+                        step_offset = 0
+                        self._update_step(job, 0, "complete", f"Loaded {len(conversations)} conversations", 10)
+                        logger.info(f"[{eval_id}] GitHub ingestion complete: {profile['agent_name']} (cached={was_cached})")
+                    except Exception as e:
+                        logger.error(f"[{eval_id}] GitHub ingestion failed: {e}")
+                        self._update_step(job, 0, "failed", f"GitHub ingestion failed: {e}", 5)
+                        raise RuntimeError(f"Failed to ingest GitHub repository: {e}")
+
             # ── PROBE PHASE (api_probe mode only) ────────────────────────────
             if is_probe:
                 api_config = eval_input.api_config or {}

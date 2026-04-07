@@ -45,12 +45,15 @@ def _validate_evaluation_input(data: dict) -> tuple[bool, str]:
 
     if input_method == "api_probe":
         api_config = data.get("api_config") or {}
-        # Catalog tools with a tool_id use pre-loaded conversations — no endpoint needed
+        # Catalog tools, GitHub URLs, and live API endpoints all use api_probe mode
         if not isinstance(api_config, dict):
-            return False, "Please enter the API endpoint URL for the agent you want to test."
-        if not api_config.get("tool_id") and not api_config.get("endpoint", "").strip():
-            return False, "Please enter the API endpoint URL for the agent you want to test."
-        if not api_config.get("tool_id") and not api_config.get("model", "").strip():
+            return False, "Please provide a tool, GitHub URL, or API endpoint."
+        has_tool = bool(api_config.get("tool_id"))
+        has_github = bool(api_config.get("github_url", "").strip())
+        has_endpoint = bool(api_config.get("endpoint", "").strip())
+        if not (has_tool or has_github or has_endpoint):
+            return False, "Please select a tool, paste a GitHub URL, or enter an API endpoint."
+        if has_endpoint and not api_config.get("model", "").strip():
             return False, "Please enter the model name for the API you want to test (e.g., gpt-4o)."
     else:
         conversations = data.get("conversations", [])

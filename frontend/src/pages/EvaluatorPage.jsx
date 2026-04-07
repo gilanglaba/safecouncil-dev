@@ -128,6 +128,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
   const docInputRef = useRef(null);
   const [inputMethod, setInputMethod] = useState("catalog");
   const [selectedTool, setSelectedTool] = useState("");
+  const [githubUrl, setGithubUrl] = useState("");
   const [apiConfig, setApiConfig] = useState({ endpoint: "", api_key: "", model: "" });
   const [uploadedConversations, setUploadedConversations] = useState([]);
   const [uploadFileName, setUploadFileName] = useState("");
@@ -260,6 +261,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
 
   const canSubmit = experts.some((e) => e.enabled) && (
     (inputMethod === "catalog" && selectedTool !== "") ||
+    (inputMethod === "github" && githubUrl.trim() !== "") ||
     (inputMethod === "api" && apiConfig.endpoint.trim() !== "") ||
     (inputMethod === "upload" && uploadedConversations.length > 0)
   );
@@ -268,9 +270,11 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
     if (!canSubmit || submitting) return;
     const agentName = inputMethod === "catalog"
       ? (selectedToolData?.name || selectedTool)
-      : inputMethod === "api"
-        ? (apiConfig.model || "API Agent")
-        : (uploadFileName || "Uploaded Agent");
+      : inputMethod === "github"
+        ? "GitHub Agent (extracting...)"
+        : inputMethod === "api"
+          ? (apiConfig.model || "API Agent")
+          : (uploadFileName || "Uploaded Agent");
     const base = {
       agent_name: agentName,
       frameworks: frameworks.filter((f) => f.checked).map((f) => f.id),
@@ -279,6 +283,8 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
     };
     if (inputMethod === "catalog") {
       onSubmit({ ...base, conversations: [], input_method: "api_probe", api_config: { tool_id: selectedTool } });
+    } else if (inputMethod === "github") {
+      onSubmit({ ...base, conversations: [], input_method: "api_probe", api_config: { github_url: githubUrl.trim() } });
     } else if (inputMethod === "api") {
       onSubmit({ ...base, conversations: [], input_method: "api_probe", api_config: { endpoint: apiConfig.endpoint, api_key: apiConfig.api_key, model: apiConfig.model } });
     } else {
@@ -358,9 +364,10 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
         {/* Method tabs */}
         <div style={{ display: "flex", gap: 6, marginBottom: 20, background: theme.bgWarm, borderRadius: 10, padding: 4 }}>
           {[
-            { id: "catalog", icon: "📋", label: "Tool Catalog", desc: "Select from pre-loaded tools" },
-            { id: "api", icon: "🔗", label: "Connect API", desc: "Auto-probe live endpoint" },
-            { id: "upload", icon: "📄", label: "Upload Files", desc: "Batch JSON/CSV upload" },
+            { id: "catalog", icon: "📋", label: "Tool Catalog", desc: "Pre-loaded tools" },
+            { id: "github", icon: "🐙", label: "GitHub Repo", desc: "Paste a public URL" },
+            { id: "api", icon: "🔗", label: "Connect API", desc: "Auto-probe endpoint" },
+            { id: "upload", icon: "📄", label: "Upload Files", desc: "JSON/CSV upload" },
           ].map((m) => (
             <button
               key={m.id}
@@ -403,6 +410,33 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
               <p style={{ fontSize: 13, color: theme.textSec, margin: "10px 0 0", lineHeight: 1.5 }}>{selectedToolData.desc}</p>
             )}
 
+          </div>
+        )}
+
+        {/* GitHub Repo */}
+        {inputMethod === "github" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ padding: 16, background: theme.violetPale, borderRadius: 10, border: `1px solid ${theme.violet}22` }}>
+              <p style={{ fontSize: 13, color: theme.text, margin: 0, lineHeight: 1.5 }}>
+                🐙 <strong>Dynamic GitHub Ingestion:</strong> Paste any public GitHub repository URL.
+                SafeCouncil reads the README and source code, extracts the agent's real system prompt,
+                and evaluates it via the council. Works for any AI agent — no config editing needed.
+              </p>
+            </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, color: theme.textSec, display: "block", marginBottom: 6 }}>GitHub Repository URL</label>
+              <input
+                value={githubUrl}
+                onChange={(e) => setGithubUrl(e.target.value)}
+                placeholder="https://github.com/FlashCarrot/VeriMedia"
+                style={inputStyle}
+                onFocus={(e) => { e.target.style.borderColor = theme.violet; }}
+                onBlur={(e) => { e.target.style.borderColor = theme.border; }}
+              />
+              <p style={{ fontSize: 12, color: theme.textTer, margin: "6px 0 0" }}>
+                Public repos only. Example: <code style={{ fontFamily: theme.fontMono }}>https://github.com/FlashCarrot/VeriMedia</code>
+              </p>
+            </div>
           </div>
         )}
 
