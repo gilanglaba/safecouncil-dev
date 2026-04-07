@@ -35,7 +35,7 @@ function FadeIn({ children, delay = 0 }) {
 }
 
 const FEATURES = [
-  { icon: "🛡️", title: "Adversarial Safety Testing", desc: "Each AI agent is tested against adversarial prompts, injection attacks, and social engineering — with evidence-based scoring on 15 dimensions." },
+  { icon: "🛡️", title: "Adversarial Safety Testing", desc: "Each AI agent is tested against adversarial prompts, injection attacks, and social engineering — with evidence-based scoring on 10 dimensions." },
   { icon: "📋", title: "Governance & Compliance", desc: "Evaluate against EU AI Act, NIST AI RMF, OWASP Top 10 for LLMs, UNESCO Ethics, ISO 42001, and UNICC UN-specific standards." },
   { icon: "🔍", title: "Trust & Transparency", desc: "Automated scoring on privacy protection, human oversight adequacy, accuracy, and disclosure practices — with specific evidence from your conversations." },
   { icon: "⚖️", title: "Cross-Critique & Debate", desc: "Three AI experts independently evaluate your agent, then critique each other — surfacing disagreements that single-model evaluation misses." },
@@ -45,7 +45,7 @@ const FEATURES = [
 
 const STEPS = [
   { num: "01", title: "Submit", desc: "Provide your agent's system prompt, use case, deployment context, and sample conversations. Or click 'Load Demo' for an instant example." },
-  { num: "02", title: "Evaluate", desc: "Three independent AI experts (Claude, GPT-4o, Gemini) each evaluate your agent across 15 safety dimensions using a rigorous rubric." },
+  { num: "02", title: "Evaluate", desc: "Three independent AI experts (Claude, GPT-4o, Gemini) each evaluate your agent across 10 safety dimensions using a rigorous rubric." },
   { num: "03", title: "Critique", desc: "Each expert reviews the others' assessments — challenging score differences, surfacing missed risks, and identifying genuine consensus." },
   { num: "04", title: "Verdict", desc: "A structured debate transcript is generated, leading to a APPROVE / REVIEW / REJECT verdict with prioritized P0–P3 mitigations." },
 ];
@@ -53,11 +53,11 @@ const STEPS = [
 const TERMINAL_LINES = [
   { text: "$ safecouncil evaluate --agent 'WFP Support Bot v2.1'", color: "#C8A8F0" },
   { text: "✓ Governance context loaded (EU AI Act, NIST, OWASP, UNESCO)", color: "#9ADBBF" },
-  { text: "⠋ Expert A (Claude) evaluating... [15 dimensions]", color: "#F5D28A" },
+  { text: "⠋ Expert A (Claude) evaluating... [10 dimensions]", color: "#F5D28A" },
   { text: "✓ Expert A complete — Score: 76/100 — REVIEW", color: "#9ADBBF" },
-  { text: "⠋ Expert B (GPT-4o) evaluating... [15 dimensions]", color: "#F5D28A" },
+  { text: "⠋ Expert B (GPT-4o) evaluating... [10 dimensions]", color: "#F5D28A" },
   { text: "✓ Expert B complete — Score: 79/100 — REVIEW", color: "#9ADBBF" },
-  { text: "⠋ Expert C (Gemini) evaluating... [15 dimensions]", color: "#F5D28A" },
+  { text: "⠋ Expert C (Gemini) evaluating... [10 dimensions]", color: "#F5D28A" },
   { text: "✓ Expert C complete — Score: 72/100 — REVIEW", color: "#9ADBBF" },
   { text: "⠋ Cross-critique round in progress...", color: "#F5D28A" },
   { text: "✓ Council debate & synthesis complete", color: "#9ADBBF" },
@@ -135,7 +135,7 @@ export default function LandingPage() {
               margin: "0 auto 36px",
             }}
           >
-            Three independent AI experts evaluate your AI agents across 15 safety dimensions,
+            Three independent AI experts evaluate your AI agents across 10 safety dimensions,
             debate their findings, and deliver a verdict aligned with UN governance standards.
           </p>
 
@@ -232,7 +232,7 @@ export default function LandingPage() {
           {[
             { num: "3", label: "Expert Agents" },
             { num: "6+", label: "Global Standards" },
-            { num: "15", label: "Safety Dimensions" },
+            { num: "10", label: "Safety Dimensions" },
             { num: "<5m", label: "Per Evaluation" },
           ].map(({ num, label }) => (
             <div key={label}>
