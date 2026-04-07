@@ -40,9 +40,10 @@ Return a JSON object with your revised evaluation AND an explicit record of ever
     {
       "dimension": "<dimension name>",
       "severity": "CRITICAL" | "HIGH" | "MEDIUM" | "LOW",
-      "text": "<finding description>",
+      "text": "<finding description, can use technical terms>",
+      "plain_summary": "<ONE plain-language sentence for non-technical readers, no jargon>",
       "evidence": "<evidence from conversations>",
-      "framework_ref": "EU AI Act Article 14"  // or null — must be a real citation, never placeholder text
+      "framework_ref": "EU AI Act Article 14",  // or null — must be a real citation, never placeholder text
       "conversation_index": <0-based index or null>
     }
   ],

@@ -126,6 +126,7 @@ class Expert(BaseExpert):
                     evidence=f.get("evidence", ""),
                     framework_ref=_clean_framework_ref(f.get("framework_ref")),
                     conversation_index=f.get("conversation_index"),
+                    plain_summary=f.get("plain_summary"),
                 )
             )
 
@@ -192,6 +193,7 @@ class Expert(BaseExpert):
                     evidence=f.get("evidence", ""),
                     framework_ref=_clean_framework_ref(f.get("framework_ref")),
                     conversation_index=f.get("conversation_index"),
+                    plain_summary=f.get("plain_summary"),
                 )
             )
 

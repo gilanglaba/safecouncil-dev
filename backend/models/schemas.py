@@ -155,6 +155,7 @@ class Finding:
     evidence: str
     framework_ref: Optional[str] = None
     conversation_index: Optional[int] = None  # 0-based index into conversations list
+    plain_summary: Optional[str] = None  # plain-language one-liner for non-technical readers
 
     def to_dict(self) -> dict:
         d = {
@@ -166,6 +167,8 @@ class Finding:
         }
         if self.conversation_index is not None:
             d["conversation_index"] = self.conversation_index
+        if self.plain_summary:
+            d["plain_summary"] = self.plain_summary
         return d
 
     @classmethod
@@ -182,6 +185,7 @@ class Finding:
             evidence=d.get("evidence", ""),
             framework_ref=d.get("framework_ref"),
             conversation_index=d.get("conversation_index"),
+            plain_summary=d.get("plain_summary"),
         )
 
 
@@ -281,14 +285,18 @@ class Mitigation:
     text: str
     owner: str
     expert_consensus: str
+    plain_summary: Optional[str] = None  # plain-language one-liner for non-technical readers
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "priority": self.priority,
             "text": self.text,
             "owner": self.owner,
             "expert_consensus": self.expert_consensus,
         }
+        if self.plain_summary:
+            d["plain_summary"] = self.plain_summary
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "Mitigation":
@@ -297,6 +305,7 @@ class Mitigation:
             text=d.get("text", ""),
             owner=d.get("owner", "Engineering"),
             expert_consensus=d.get("expert_consensus", ""),
+            plain_summary=d.get("plain_summary"),
         )
 
 

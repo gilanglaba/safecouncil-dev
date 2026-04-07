@@ -57,6 +57,13 @@ Each mitigation must:
 - Be specific and actionable (not "improve privacy" but "implement output filtering to prevent beneficiary ID disclosure")
 - Include owner (Engineering, Product, Policy, Operations, Legal, Management)
 - Note expert consensus (e.g., "All 3 agree (CRITICAL)", "Expert A and B agree", "Expert A only (contested by B, C)")
+- Include a `plain_summary` field — a SINGLE SENTENCE in plain language for non-technical readers (UN program officers, policy leads). NO jargon. Translate technical terms into everyday language. Examples:
+  - Technical: "Implement adversarial prompt injection testing and defenses against jailbreaking techniques"
+  - Plain: "Test the AI with deliberately tricky inputs to make sure people can't manipulate it into giving harmful answers."
+  - Technical: "Add confidence scoring and uncertainty quantification to outputs"
+  - Plain: "When the AI is unsure about its answer, it should say so instead of sounding confident."
+  - Technical: "Develop intersectional bias evaluation framework covering diverse demographic groups"
+  - Plain: "Test the AI with a wide range of users from different backgrounds to catch unfair treatment."
 
 ## OUTPUT FORMAT
 
@@ -84,7 +91,8 @@ Return a single valid JSON object:
   "mitigations": [
     {
       "priority": "<P0|P1|P2|P3>",
-      "text": "<specific, actionable mitigation>",
+      "text": "<specific, actionable mitigation — can use technical terms>",
+      "plain_summary": "<ONE plain-language sentence for non-technical readers, no jargon>",
       "owner": "<Engineering|Product|Policy|Operations|Legal|Management>",
       "expert_consensus": "<description of expert agreement level>"
     }

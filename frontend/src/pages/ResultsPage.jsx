@@ -805,6 +805,20 @@ function FindingsTab({ result }) {
                     <span style={{ fontWeight: 600, fontSize: 13, color: theme.text }}>{f.dimension}</span>
                     <span style={{ fontSize: 11, color: theme.textTer, fontStyle: "italic" }}>— {f.expert_name}</span>
                   </div>
+                  {f.plain_summary && (
+                    <div style={{
+                      fontSize: 12,
+                      fontStyle: "italic",
+                      color: theme.textSec,
+                      background: theme.bgWarm,
+                      padding: "5px 9px",
+                      borderRadius: 5,
+                      marginBottom: 6,
+                      borderLeft: `3px solid ${theme.unBlue}`,
+                    }}>
+                      💡 In plain language: {f.plain_summary}
+                    </div>
+                  )}
                   <div style={{ fontSize: 13, color: theme.textSec, lineHeight: 1.5, marginBottom: f.evidence ? 6 : 0 }}>
                     {f.text}
                   </div>
@@ -888,6 +902,20 @@ function ActionItemsTab({ result, onDownloadPDF }) {
                 {pc.label}
               </span>
               <div style={{ flex: 1 }}>
+                {m.plain_summary && (
+                  <div style={{
+                    fontSize: 13,
+                    fontStyle: "italic",
+                    color: theme.textSec,
+                    background: theme.bgWarm,
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    marginBottom: 8,
+                    borderLeft: `3px solid ${theme.unBlue}`,
+                  }}>
+                    💡 In plain language: {m.plain_summary}
+                  </div>
+                )}
                 <div style={{ fontSize: 14, color: theme.text, lineHeight: 1.5, marginBottom: 6 }}>{m.text}</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <Badge label={m.owner} preset="blue" style={{ fontSize: 11 }} />

@@ -330,6 +330,7 @@ class SimpleOrchestrator(BaseOrchestrator):
                     text=m.get("text", ""),
                     owner=m.get("owner", "Engineering"),
                     expert_consensus=m.get("expert_consensus", ""),
+                    plain_summary=m.get("plain_summary"),
                 )
             )
 
