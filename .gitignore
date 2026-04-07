@@ -35,6 +35,10 @@ node_modules/
 # Reference projects (local only, used by Claude Code agents)
 reference/
 
+# Claude Code local config (agents, skills) and instructions
+.claude/
+CLAUDE.md
+
 # Paper context bundles (contain source code snapshots)
 docs/paper1/
 docs/paper2/

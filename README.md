@@ -253,6 +253,20 @@ safecouncil/
 
 ---
 
+## Project Contributors
+
+SafeCouncil is a 3-student capstone where each contributor owns a distinct project area. The codebase is organized so each student's work maps to a clear set of modules:
+
+| Contributor | Project Area | Owns these modules |
+|---|---|---|
+| **Pengyun (Jimmy) Ma** | Platform & Infrastructure | `backend/config.py`, `backend/governance/`, `backend/dimensions/`, `backend/services/github_ingestion_service.py`, `backend/experts/llm_providers/` (provider abstractions, local LLM support, modular architecture) |
+| **Gilang Laba** | AI Orchestration & Synthesis | `backend/orchestrators/`, `backend/experts/expert.py`, `backend/experts/base_expert.py`, `backend/prompts/` (council-of-experts, deliberative pipeline, cross-critique, score revision, synthesis) |
+| **Iris Zhang** | UX & Integration | `frontend/`, `backend/services/evaluation_service.py`, `backend/app.py` (React UI, evaluator/results pages, API integration, end-to-end user flow) |
+
+Shared infrastructure (`backend/models/schemas.py`, `backend/demo_data.py`, `tests/`, `Makefile`) is owned jointly. The three projects integrate through the platform's modular architecture — each layer can be developed and tested independently.
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
