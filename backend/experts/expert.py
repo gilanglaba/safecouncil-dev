@@ -26,6 +26,35 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Patterns that indicate hallucinated placeholder framework refs.
+# These are scrubbed before findings are saved to the audit log.
+# GPT-4o is the worst offender — it sometimes returns "some-framework-ref"
+# from interpreting the angle-bracket schema example as a literal template.
+_FRAMEWORK_REF_PLACEHOLDER_PATTERNS = (
+    "some-framework-ref",
+    "framework reference",
+    "framework-ref",
+    "<framework",
+    "placeholder",
+    "ref or null",
+    "ref if applicable",
+    "n/a",
+)
+
+
+def _clean_framework_ref(ref):
+    """Return None if ref is empty, placeholder, or template text. Otherwise return as-is."""
+    if not ref or not isinstance(ref, str):
+        return None
+    ref_stripped = ref.strip()
+    ref_lower = ref_stripped.lower()
+    if not ref_lower or ref_lower in ("null", "none"):
+        return None
+    for pattern in _FRAMEWORK_REF_PLACEHOLDER_PATTERNS:
+        if pattern in ref_lower:
+            return None
+    return ref_stripped
+
 
 class Expert(BaseExpert):
     """
@@ -95,7 +124,7 @@ class Expert(BaseExpert):
                     severity=severity,
                     text=f.get("text", ""),
                     evidence=f.get("evidence", ""),
-                    framework_ref=f.get("framework_ref"),
+                    framework_ref=_clean_framework_ref(f.get("framework_ref")),
                     conversation_index=f.get("conversation_index"),
                 )
             )
@@ -161,7 +190,7 @@ class Expert(BaseExpert):
                     severity=severity,
                     text=f.get("text", ""),
                     evidence=f.get("evidence", ""),
-                    framework_ref=f.get("framework_ref"),
+                    framework_ref=_clean_framework_ref(f.get("framework_ref")),
                     conversation_index=f.get("conversation_index"),
                 )
             )
