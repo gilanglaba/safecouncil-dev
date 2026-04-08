@@ -321,6 +321,12 @@ If you enable the local expert without setting `LOCAL_ENDPOINT` / `LOCAL_MODEL`,
 
 The system automatically adapts: compact prompts, reduced token limits, extended timeouts.
 
+### On-premise synthesis (cloud evaluation, on-prem report)
+
+SafeCouncil also supports running **only the synthesis step** on a local LLM while keeping cross-critique evaluation on cloud APIs (or vice versa). On the Evaluator page under "Council Method", switch **Synthesis runs on** to **On-Premise (local LLM)** to route the final report generation to your `LOCAL_ENDPOINT`. This is useful for UN/IGO scenarios where the consolidated verdict document must stay on your hardware even when evaluation runs cloud.
+
+Synthesis is the most demanding prompt in the system (long context, structured JSON output). It works best with 70B-class local models (Llama 3.1 70B, Qwen 2.5 72B). Smaller models may produce truncated reports — if local synthesis fails JSON parsing, SafeCouncil automatically falls back to a deterministic summary and surfaces a warning badge in the result page.
+
 ---
 
 ## Demo Mode (run without API keys)

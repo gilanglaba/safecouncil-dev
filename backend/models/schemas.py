@@ -85,6 +85,7 @@ class EvaluationInput:
     input_method: Optional[str] = None   # "manual" | "api_probe" | "upload"
     api_config: Optional[dict] = None    # {endpoint, api_key, model, probe_count}
     orchestration_method: Optional[str] = None  # "deliberative" | "aggregate"
+    synthesis_provider: Optional[str] = None  # "claude" | "gpt4o" | "gemini" | "local" — None = elect from experts
 
     def to_dict(self) -> dict:
         return {
@@ -100,6 +101,7 @@ class EvaluationInput:
             "input_method": self.input_method,
             "api_config": self.api_config,
             "orchestration_method": self.orchestration_method,
+            "synthesis_provider": self.synthesis_provider,
         }
 
     @classmethod
@@ -119,6 +121,7 @@ class EvaluationInput:
             input_method=d.get("input_method"),
             api_config=d.get("api_config"),
             orchestration_method=d.get("orchestration_method"),
+            synthesis_provider=d.get("synthesis_provider"),
         )
 
 
@@ -340,6 +343,8 @@ class CouncilResult:
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     orchestrator_method: str = "deliberative"
     conversations: List[Conversation] = field(default_factory=list)
+    synthesis_fallback: bool = False  # True if synthesis JSON parse failed and deterministic summary was used
+    synthesizer_name: Optional[str] = None  # Which expert/provider ran synthesis
 
     def to_dict(self) -> dict:
         d = {
@@ -363,6 +368,8 @@ class CouncilResult:
                 "total_tokens_used": self.total_tokens_used,
                 "total_cost_usd": round(self.total_cost_usd, 4),
                 "evaluation_time_seconds": round(self.evaluation_time_seconds, 1),
+                "synthesis_fallback": self.synthesis_fallback,
+                "synthesizer_name": self.synthesizer_name,
             },
         }
         return d

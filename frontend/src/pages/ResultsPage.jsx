@@ -1183,6 +1183,11 @@ function ResultsView({ result, onDownloadPDF }) {
             {assessments.length} of {assessments.length} experts recommend <strong>{verdict.final_verdict}</strong>.
             <br /><span style={{ fontSize: 12, opacity: 0.75 }}>{VERDICT_EXPLANATIONS[verdict.final_verdict] || ""}</span>
           </div>
+          {result.audit?.synthesis_fallback && (
+            <div style={{ marginTop: 8, padding: "6px 10px", borderRadius: 6, background: "#FFF8E1", border: "1px solid #F5D28A", fontSize: 11, color: "#7A5A00", display: "inline-block" }}>
+              ⚠ Synthesis fell back to deterministic summary — local model output could not be parsed as JSON.
+            </div>
+          )}
         </div>
         {/* Right: agent info + download */}
         <div style={{ textAlign: "right", flexShrink: 0 }}>

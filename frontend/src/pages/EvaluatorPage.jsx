@@ -165,6 +165,16 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
   const [uploadedDocs, setUploadedDocs] = useState([]);  // [{filename, status, yaml, error}]
   const [reviewingDoc, setReviewingDoc] = useState(null); // {filename, yaml} — doc being reviewed
   const [orchestrationMethod, setOrchestrationMethod] = useState("deliberative");
+  const [synthesisProvider, setSynthesisProvider] = useState("claude"); // "claude" | "local"
+  const [localAvailable, setLocalAvailable] = useState(false);
+
+  // Probe /api/health on mount to learn whether the local LLM is configured
+  useEffect(() => {
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((d) => setLocalAvailable(Boolean(d?.experts?.local?.available)))
+      .catch(() => setLocalAvailable(false));
+  }, []);
 
   const selectedToolData = TOOL_CATALOG.find(tc => tc.id === selectedTool);
 
@@ -280,6 +290,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
       frameworks: frameworks.filter((f) => f.checked).map((f) => f.id),
       experts: experts.map(({ llm, enabled }) => ({ llm, enabled })),
       orchestration_method: orchestrationMethod,
+      synthesis_provider: orchestrationMethod === "deliberative" ? synthesisProvider : null,
     };
     if (inputMethod === "catalog") {
       onSubmit({ ...base, conversations: [], input_method: "api_probe", api_config: { tool_id: selectedTool } });
@@ -838,6 +849,55 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
             </div>
           ))}
         </div>
+
+        {/* Synthesis provider toggle — only meaningful for Deliberative */}
+        {orchestrationMethod === "deliberative" && (
+          <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${theme.borderSubtle}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>Synthesis runs on:</span>
+              <Tooltip text="Synthesis is the final step that generates the consolidated debate transcript and verdict report. You can run it on a cloud LLM (Claude) or on your own on-premise LLM, even if cross-critique runs on cloud APIs." />
+            </div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {[
+                { id: "claude", label: "Cloud (Claude)", disabled: false, hint: "Default — best report quality" },
+                { id: "local", label: "On-Premise (local LLM)", disabled: !localAvailable, hint: localAvailable ? "Routes to your LOCAL_ENDPOINT" : "Configure LOCAL_ENDPOINT in backend/.env to enable" },
+              ].map((opt) => (
+                <label
+                  key={opt.id}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 14px",
+                    borderRadius: 10,
+                    border: `1.5px solid ${synthesisProvider === opt.id && !opt.disabled ? theme.violet : theme.borderSubtle}`,
+                    background: synthesisProvider === opt.id && !opt.disabled ? theme.violetPale + "55" : theme.surface,
+                    cursor: opt.disabled ? "not-allowed" : "pointer",
+                    opacity: opt.disabled ? 0.5 : 1,
+                  }}
+                  title={opt.hint}
+                >
+                  <input
+                    type="radio"
+                    name="synthesisProvider"
+                    value={opt.id}
+                    checked={synthesisProvider === opt.id}
+                    disabled={opt.disabled}
+                    onChange={() => !opt.disabled && setSynthesisProvider(opt.id)}
+                    style={{ accentColor: theme.violet }}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>{opt.label}</span>
+                  <span style={{ fontSize: 11, color: theme.textTer }}>{opt.hint}</span>
+                </label>
+              ))}
+            </div>
+            {synthesisProvider === "local" && (
+              <div style={{ marginTop: 10, padding: "8px 12px", background: theme.amberPale || "#FFF8E1", borderRadius: 8, fontSize: 12, color: theme.textSec, border: `1px solid ${theme.amberBorder || "#F5D28A"}` }}>
+                ⚠ Local synthesis works best with 70B+ models. Smaller models may produce truncated reports — SafeCouncil will fall back to a deterministic summary if JSON parsing fails.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Submission ─────────────────────────────────────────────────────── */}

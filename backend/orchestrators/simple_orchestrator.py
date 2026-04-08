@@ -271,13 +271,21 @@ class SimpleOrchestrator(BaseOrchestrator):
         else:
             synthesizer = self.synthesizer
 
+        synthesis_fallback = False
+        synthesizer_provider = getattr(synthesizer.provider, "__class__", type(None)).__name__
         try:
             synthesis_raw = synthesizer.synthesize(eval_input, assessments, critiques, position_statements)
             synthesis_data = synthesizer.extract_json(synthesis_raw)
         except Exception as e:
-            logger.error(f"[SimpleOrchestrator] Synthesis failed: {e}")
+            logger.error(
+                f"[SimpleOrchestrator] Synthesis failed (provider={synthesizer_provider}, "
+                f"name={synthesizer.name}): {e}"
+            )
             # Generate minimal synthesis from available assessments
             synthesis_data = self._fallback_synthesis(assessments)
+            synthesis_fallback = True
+        self._synthesis_fallback = synthesis_fallback
+        self._synthesizer_name = synthesizer.name
 
         self._fire_progress(on_progress, self.STEP_SYNTHESIS, "complete",
                             "Synthesis complete", 92)
@@ -374,6 +382,8 @@ class SimpleOrchestrator(BaseOrchestrator):
             agent_name=self.agent_name,
             timestamp=datetime.now(timezone.utc).isoformat(),
             conversations=eval_input.conversations,
+            synthesis_fallback=getattr(self, "_synthesis_fallback", False),
+            synthesizer_name=getattr(self, "_synthesizer_name", None),
         )
 
     # ── Output Quality: Structured, Readable, Agent-Specific ────────────────

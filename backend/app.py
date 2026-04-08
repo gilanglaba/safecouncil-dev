@@ -76,6 +76,12 @@ def _validate_evaluation_input(data: dict) -> tuple[bool, str]:
     if not enabled:
         return False, "Please enable at least one AI expert. Toggle on Claude, GPT-4o, or Gemini to proceed."
 
+    synthesis_provider = data.get("synthesis_provider")
+    if synthesis_provider is not None:
+        allowed = {"claude", "gpt4o", "gemini", "local"}
+        if synthesis_provider not in allowed:
+            return False, f"Invalid synthesis_provider '{synthesis_provider}'. Must be one of: {', '.join(sorted(allowed))}."
+
     return True, ""
 
 
@@ -382,6 +388,16 @@ def health_check():
     try:
         expert_status = Config.get_expert_model_info()
         any_available = any(v.get("available") for v in expert_status.values())
+
+        # Local LLM availability — required if user wants on-prem synthesis.
+        local_endpoint = os.getenv("LOCAL_ENDPOINT", "").strip()
+        local_model = os.getenv("LOCAL_MODEL", "").strip()
+        local_status = {
+            "available": bool(local_endpoint and local_model),
+            "endpoint_set": bool(local_endpoint),
+            "model_set": bool(local_model),
+        }
+        expert_status["local"] = local_status
 
         # SafeCouncil is able to run synthesis pipeline without requiring a live
         # API key. demo_mode reflects whether evaluation requests will bypass

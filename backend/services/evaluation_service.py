@@ -378,8 +378,9 @@ class EvaluationService:
             try:
                 orchestrator = OrchestratorFactory.create(strategy, experts)
                 # Set extra params for deliberative orchestrator
+                synthesizer_expert = self._select_synthesizer(eval_input, experts)
                 if hasattr(orchestrator, "synthesizer_expert"):
-                    orchestrator.synthesizer_expert = experts[0]
+                    orchestrator.synthesizer_expert = synthesizer_expert
                 if hasattr(orchestrator, "eval_id"):
                     orchestrator.eval_id = eval_id
                 if hasattr(orchestrator, "agent_name"):
@@ -388,7 +389,7 @@ class EvaluationService:
                 logger.warning(f"Unknown strategy '{strategy}', falling back to deliberative")
                 orchestrator = SimpleOrchestrator(
                     experts=experts,
-                    synthesizer_expert=experts[0],
+                    synthesizer_expert=self._select_synthesizer(eval_input, experts),
                     eval_id=eval_id,
                     agent_name=eval_input.agent_name,
                 )
@@ -536,6 +537,40 @@ class EvaluationService:
                 logger.warning(f"Skipping {llm} expert: {e}")
 
         return experts
+
+    def _select_synthesizer(self, eval_input: EvaluationInput, experts: list):
+        """
+        Pick which Expert runs the synthesis step.
+
+        If `eval_input.synthesis_provider` is set, build a one-shot Expert with
+        that provider — even if it isn't in the council expert list. This lets
+        users run cross-critique on cloud LLMs while keeping the consolidated
+        verdict report on-premise (or vice versa).
+
+        If unset, fall back to the first council expert (current default).
+        Raises ValueError if the requested provider can't be created (e.g. local
+        without LOCAL_ENDPOINT) — the existing fail-fast guard in
+        ProviderRegistry handles the error message.
+        """
+        provider_key = getattr(eval_input, "synthesis_provider", None)
+        if not provider_key:
+            return experts[0]
+
+        # Already in the council? Reuse it (avoids double provider instantiation).
+        for e in experts:
+            if getattr(e.provider, "__class__", None) and provider_key in (
+                e.name.lower(),
+                getattr(e, "llm_provider", "").lower() if hasattr(e, "llm_provider") else "",
+            ):
+                return e
+
+        # Build a one-shot synthesizer Expert with the requested provider.
+        registry = ProviderRegistry()
+        dimensions = load_all_dimensions()
+        provider = registry.create(provider_key=provider_key)
+        synth_name = f"Synthesizer ({provider.model})"
+        logger.info(f"Building one-shot synthesizer with provider={provider_key}")
+        return Expert(name=synth_name, provider=provider, dimensions=dimensions)
 
     def _update_step(
         self,
