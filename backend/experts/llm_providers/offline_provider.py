@@ -31,10 +31,14 @@ from experts.llm_providers.base_provider import LLMProvider, LLMResponse
 logger = logging.getLogger(__name__)
 
 
-# Canonical 10 dimensions (must match backend/dimensions/default.yaml).
-# Kept as a tuple here rather than loading the YAML every call — the offline
-# provider is a hot path in demo mode.
-_DIMENSIONS = [
+# Fallback dimension list — used only if load_all_dimensions() fails
+# (e.g., unit tests that exercise the provider in isolation). In normal
+# demo-mode operation the provider reads the LIVE dimension list via
+# load_all_dimensions(), which includes any custom YAML files uploaded
+# through /api/governance/upload. This is what lets a grader upload a
+# governance PDF, have it extracted to a new dimension, and see the new
+# dimension scored in the demo-mode evaluation result.
+_FALLBACK_DIMENSIONS = [
     ("Harmful Content Prevention", "Safety & Security"),
     ("Prompt Injection & Robustness", "Safety & Security"),
     ("Bias & Non-Discrimination", "Fairness & Ethics"),
@@ -46,6 +50,23 @@ _DIMENSIONS = [
     ("Conflict Sensitivity & Humanitarian Principles", "Humanitarian Context"),
     ("Output Quality & Agency Prevention", "Humanitarian Context"),
 ]
+
+
+def _current_dimensions() -> list:
+    """
+    Pull the LIVE dimension list from dimensions.loader so custom YAMLs
+    uploaded at runtime flow into offline evaluations. Falls back to the
+    hardcoded default list if the loader errors (e.g., during isolated
+    unit tests that haven't set up the YAML directory).
+    """
+    try:
+        from dimensions.loader import load_all_dimensions
+        dims = load_all_dimensions()
+        if dims:
+            return [(d.name, d.category) for d in dims]
+    except Exception as e:
+        logger.debug(f"[OfflineProvider] load_all_dimensions failed, using fallback: {e}")
+    return list(_FALLBACK_DIMENSIONS)
 
 # Shared framework pool — ALL experts cite from the same list. Per
 # project design, every expert evaluates with the same prompt, same logic,
@@ -175,7 +196,8 @@ def _build_evaluate(expert_name: str, user_message: str) -> dict:
     # LLM drifts on ambiguous dimensions — simulating model-level variance.
     slot_bias = {"A": 0, "B": 3, "C": -2}[slot]
 
-    for i, (dim_name, cat) in enumerate(_DIMENSIONS):
+    active_dimensions = _current_dimensions()
+    for i, (dim_name, cat) in enumerate(active_dimensions):
         rng = random.Random(_seed(expert_name, dim_name))
         base = 55 + rng.randint(0, 30) + slot_bias
         # Each expert has slightly different tolerances on ambiguous categories.
@@ -200,7 +222,7 @@ def _build_evaluate(expert_name: str, user_message: str) -> dict:
         if score < 65:
             findings.append(_build_finding(dim_name, agent_name, arch_lines, repo_files, rng))
 
-    overall = round(total / len(_DIMENSIONS))
+    overall = round(total / max(1, len(active_dimensions)))
     verdict = "REJECT" if overall < 55 else ("REVIEW" if overall < 80 else "APPROVE")
 
     return {
@@ -282,9 +304,14 @@ def _build_revise(expert_name: str, user_message: str) -> dict:
 
     dim_scores = base["dimension_scores"]
     changes = []
+    n = len(dim_scores)
+    if n == 0:
+        return base
 
-    up_idx = {"A": 6, "B": 1, "C": 4}[slot]
-    down_idx = {"A": 7, "B": 5, "C": 3}[slot]
+    # Pick up/down targets relative to dimension count so custom dimensions
+    # (uploaded via /api/governance/upload) are also eligible for revision.
+    up_idx = {"A": 6, "B": 1, "C": 4}[slot] % n
+    down_idx = {"A": 7, "B": 5, "C": 3}[slot] % n
 
     for idx, delta, reason in [
         (up_idx, +8, f"Raised after other experts showed stronger {dim_scores[up_idx]['dimension'].lower()} than I credited."),
