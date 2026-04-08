@@ -76,19 +76,31 @@ Open http://localhost:3000 — the frontend proxies `/api/*` to the backend on p
 ┌─────────────────────────────────────────────────────────────────┐
 │          OrchestratorFactory → Deliberative or Aggregate        │
 │                                                                 │
-│  Deliberative:                    Aggregate:                    │
+│  Deliberative (8 phases):         Aggregate (3 phases):         │
 │  1. Governance context            1. Governance context         │
 │  2. 3× Expert evaluation          2. 3× Expert evaluation      │
-│  3. Cross-critique                3. Average scores             │
-│  4. Score revision                4. Majority vote verdict      │
-│  5. Synthesis + debate                                          │
-│  6. Final verdict                                               │
-└──────────┬────────────────┬───────────────────┬────────────────┘
-           │                │                   │
-           ▼                ▼                   ▼
-    Anthropic API      OpenAI API         Google AI API
-    (claude-sonnet)    (gpt-4o)           (gemini-2.5-pro)
+│  3. Cross-critique (parallel)     3. Average + majority vote    │
+│  4. Score revision (parallel)                                   │
+│  5. Final position statements                                   │
+│  6. Synthesis + debate transcript                               │
+│  7. Output specificity enforcer                                 │
+│  8. Executive summary + verdict                                 │
+└──────────┬──────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│   Expert (strategy pattern) → LLMProvider (abstract interface)  │
+│                                                                 │
+│   ProviderRegistry resolves provider_key → concrete provider:   │
+│     "claude"   → Anthropic API        (claude-sonnet)           │
+│     "gpt4o"    → OpenAI API           (gpt-4o)                  │
+│     "gemini"   → Google AI API        (gemini-2.5-pro)          │
+│     "local"    → LM Studio / Ollama / vLLM (on-prem)            │
+│     "offline"  → OfflineProvider      (DEMO_MODE, no API key)   │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+Every LLM-facing step goes through `Expert` → `LLMProvider`, so adding a new provider means writing one class and registering it — no orchestrator changes. The **offline** provider is what lets the full deliberative pipeline run in DEMO_MODE without any API keys (see [Demo Mode](#demo-mode-run-without-api-keys) below).
 
 ---
 
@@ -119,10 +131,12 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
 | `POST` | `/api/evaluate/demo` | Submit demo evaluation (WFP chatbot) |
 | `GET` | `/api/evaluate/{id}/status` | Poll evaluation progress |
 | `GET` | `/api/evaluate/{id}` | Get full results |
+| `GET` | `/api/evaluate/{id}/pdf` | Download PDF report |
 | `GET` | `/api/evaluations` | List all past evaluations |
 | `GET` | `/api/frameworks` | List governance frameworks |
-| `GET` | `/api/health` | Health check + API key status |
-| `POST` | `/api/governance/upload` | Upload governance document for dimension extraction |
+| `GET` | `/api/health` | Health check + provider availability (`claude`, `gpt4o`, `gemini`, `local`) + `demo_mode` flag |
+| `POST` | `/api/governance/upload` | Upload governance document, extract dimensions YAML |
+| `POST` | `/api/governance/confirm` | Save reviewed custom dimensions YAML to `backend/dimensions/custom/` |
 
 ### POST /api/evaluate
 
@@ -146,11 +160,18 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
     {"llm": "gpt4o", "enabled": true},
     {"llm": "gemini", "enabled": true}
   ],
-  "orchestration_method": "deliberative"
+  "orchestration_method": "deliberative",
+  "synthesis_provider": "claude"
 }
 ```
 
-`orchestration_method`: `"deliberative"` (default) or `"aggregate"`.
+- `orchestration_method`: `"deliberative"` (default) or `"aggregate"`.
+- `synthesis_provider` *(optional)*: `"claude"` / `"gpt4o"` / `"gemini"` / `"local"`. Lets you run cross-critique on cloud LLMs while keeping the final synthesis report on your own hardware (or vice versa). Defaults to the first council expert.
+- **GitHub URL shortcut**: any of these three shapes works, no `conversations` required:
+  - `{"input_method": "github", "github_url": "https://github.com/..."}` *(shortest)*
+  - `{"input_method": "github", "api_config": {"github_url": "..."}}`
+  - `{"input_method": "api_probe", "api_config": {"github_url": "..."}}` *(canonical)*
+- `experts[].llm` also accepts `"offline"` for the deterministic demo provider. The server automatically uses `offline` when `DEMO_MODE` is active.
 
 ### Response Structure
 
@@ -159,6 +180,8 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
   "eval_id": "a1b2c3d4",
   "agent_name": "...",
   "orchestrator_method": "deliberative",
+  "timestamp": "2026-04-08T14:00:00Z",
+  "executive_summary": "SafeCouncil reviewed VeriMedia and concluded it needs changes before it can be deployed safely. The most urgent issues are audit trail gaps observed in app.py and access control in finetune.py. Recommended next step: implement server-side audit logging...",
   "verdict": {
     "final_verdict": "REVIEW",
     "confidence": 87,
@@ -170,26 +193,49 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
   "disagreements": [...],
   "mitigations": [...],
   "audit": {
-    "total_api_calls": 7,
+    "total_api_calls": 13,
     "total_tokens_used": 40000,
-    "evaluation_time_seconds": 180.0
+    "total_cost_usd": 0.18,
+    "evaluation_time_seconds": 180.0,
+    "demo_mode": false,
+    "synthesis_fallback": false,
+    "synthesizer_name": "Expert 1 (claude-sonnet-4-20250514)",
+    "specificity": {
+      "agent_name_referenced": true,
+      "conversation_evidence_cited": true,
+      "debate_transcript_present": true,
+      "enforcement": {
+        "findings_text_patched": 0,
+        "findings_evidence_patched": 0,
+        "debate_messages_patched": 0,
+        "dimension_details_patched": 0
+      }
+    }
   }
 }
 ```
+
+- **`executive_summary`** — plain-English 3–5 sentence summary for non-technical readers, rendered as a persistent card above every tab on the Results page.
+- **`audit.demo_mode`** — `true` when the evaluation ran offline via `OfflineProvider`.
+- **`audit.synthesis_fallback`** — `true` if the synthesizer's JSON couldn't be parsed and a deterministic fallback summary was used.
+- **`audit.synthesizer_name`** — which expert generated the synthesis (useful when the synthesis provider differs from the council experts).
+- **`audit.specificity.enforcement`** — count of findings/debate messages that the output-specificity enforcer patched in place to guarantee agent-specific references, regardless of what the LLM returned.
 
 ---
 
 ## How the Evaluation Works
 
-1. **Submit**: User provides agent details + conversation examples (or connects an API, or selects from Tool Catalog)
+1. **Submit**: User provides agent details + conversation examples, pastes a GitHub URL, connects an API, or selects from the Tool Catalog
 2. **Queue**: Backend creates a job and returns `eval_id` immediately (202 Accepted)
 3. **Governance context**: RAG-lite lookup of selected frameworks (EU AI Act, NIST, OWASP, UNESCO, ISO 42001, UNICC)
-4. **Independent evaluation**: Each expert evaluates the agent across **10 safety dimensions** in 5 categories
-5. **Cross-critique** *(deliberative only)*: Each expert reviews others' assessments, challenging score differences and surfacing missed risks
-6. **Score revision** *(deliberative only)*: Experts revise scores based on critiques, producing traceable `score_changes` with justifications
-7. **Synthesis** *(deliberative only)*: One expert generates a debate transcript narrating the actual deliberation
-8. **Verdict**: APPROVE / REVIEW / REJECT with prioritized mitigations
-9. **Audit log**: Complete JSON record saved to `backend/logs/{eval_id}.json`
+4. **Independent evaluation** *(parallel)*: Each expert evaluates the agent across **10 safety dimensions** in 5 categories
+5. **Cross-critique** *(deliberative only, parallel)*: Each expert reviews others' assessments, challenging score differences and surfacing missed risks
+6. **Score revision** *(deliberative only, parallel)*: Experts revise scores based on critiques, producing traceable `score_changes` with justifications
+7. **Final position statements** *(deliberative only, parallel)*: Each expert issues a final 2–4 sentence position after the critique round
+8. **Synthesis** *(deliberative only)*: One expert generates a debate transcript narrating the actual deliberation, plus agreements, disagreements, mitigations, and an **executive summary** for non-technical readers
+9. **Output specificity enforcement**: Deterministic post-processor scans every finding, dimension detail, and debate message. Any piece that doesn't reference the agent by name is patched in place using architecture notes / filenames pulled from `eval_input.environment`. Guarantees the final report is grounded in the actual agent regardless of LLM behavior. Enforcement stats surface in `audit.specificity`.
+10. **Verdict**: APPROVE / REVIEW / REJECT with prioritized mitigations
+11. **Audit log**: Complete JSON record saved to `backend/logs/{eval_id}.json` (gitignored)
 
 ---
 
@@ -210,15 +256,44 @@ SafeCouncil accepts AI agents through four input modes — pick whichever matche
 
 ---
 
+## Results Page
+
+Every result lives at `/results/{eval_id}` with a layout designed for two very different readers in one page: UN/IGO policy officers (plain-language, no jargon) and AI/ML reviewers (per-expert scores, debate transcript, evidence log).
+
+**Persistent header** (visible on every tab):
+- **Verdict banner** — APPROVE / REVIEW / REJECT with confidence + agreement rate, method tag, and a short narrative explanation
+- **Executive Summary card** — plain-English 3–5 sentence summary of the council's findings. Sits directly below the verdict banner and renders on every tab, so the stakeholder view is always one glance away.
+
+**8 tabs** (default active tab = **Overview**, the plain-language landing):
+
+| Tab | Content | Primary audience |
+|---|---|---|
+| **Overview** | Top 3 risks in plain language + top 3 recommended next steps (numbered cards) | Non-technical stakeholders |
+| **Expert Panel** | Per-expert cards with initial → final scores, revision rationales, Council Consensus + Points of Contention | Reviewers tracking per-expert reasoning |
+| **Score Comparison** | 10 dimensions × N experts score matrix with hover tooltips | Analysts comparing expert disagreement |
+| **Compliance** | Per-framework pass / partial / fail derived from findings | Governance / legal |
+| **Evidence Log** | Numbered probe/response conversations, amber-highlighted when a finding is attached | Auditors |
+| **Council Deliberation** *(deliberative)* / **Expert Comparison** *(aggregate)* | Full debate transcript with topic dividers and speaker filters, or side-by-side expert comparison for aggregate method | Method researchers |
+| **All Findings** | Severity-grouped finding list with source-conversation drilldown | Security reviewers |
+| **Action Items** | Prioritized mitigations in plain language, PDF download button | Engineering |
+
+The **Overview tab is the default** so a non-technical reader lands on the plain-language view; technical users click into the other tabs for depth. No view-mode toggle is needed — progressive disclosure happens through normal tab navigation.
+
+---
+
 ## Project Structure
 
 ```
 safecouncil/
 ├── backend/
-│   ├── app.py                          # Flask API routes
-│   ├── config.py                       # Environment configuration
+│   ├── app.py                          # Flask API routes + request validation
+│   ├── config.py                       # Environment config, DEMO_MODE auto-detect, placeholder rejection
+│   ├── demo_data.py                    # Small: DEMO_INPUT + catalog profiles + thin loader for the fixtures below
+│   ├── demo_fixtures/                  # Pre-built deliberative results as JSON (fallback only; real demo uses OfflineProvider)
+│   │   ├── wfp_deliberative.json
+│   │   └── verimedia_deliberative.json
 │   ├── requirements.txt
-│   ├── .env.example
+│   ├── .env.example                    # Empty API keys by default → DEMO_MODE engages automatically
 │   ├── models/schemas.py               # Dataclasses (EvaluationInput, ExpertAssessment, CouncilResult)
 │   ├── experts/
 │   │   ├── base_expert.py              # Abstract base + JSON extraction
@@ -226,12 +301,13 @@ safecouncil/
 │   │   └── llm_providers/
 │   │       ├── base_provider.py        # LLMProvider interface
 │   │       ├── anthropic_provider.py   # Claude
-│   │       ├── openai_provider.py      # GPT-4o + local LLM (LM Studio)
+│   │       ├── openai_provider.py      # GPT-4o + local LLM (LM Studio / Ollama / vLLM)
 │   │       ├── google_provider.py      # Gemini
-│   │       └── provider_registry.py    # Factory for creating providers
+│   │       ├── offline_provider.py     # Deterministic demo-mode provider — runs the real pipeline with no API keys
+│   │       └── provider_registry.py    # Factory (claude | gpt4o | gemini | local | offline)
 │   ├── orchestrators/
 │   │   ├── base_orchestrator.py        # Strategy pattern base
-│   │   ├── simple_orchestrator.py      # Deliberative pipeline (critique → revise → synthesize)
+│   │   ├── simple_orchestrator.py      # Deliberative pipeline (critique → revise → position → synthesize) + output-specificity enforcer
 │   │   ├── aggregate_orchestrator.py   # Aggregate pipeline (average → majority vote)
 │   │   └── orchestrator_factory.py     # Factory for creating orchestrators
 │   ├── prompts/
@@ -241,30 +317,43 @@ safecouncil/
 │   │   └── synthesis_prompt.py         # Debate + verdict prompt
 │   ├── dimensions/
 │   │   ├── default.yaml                # 10 evaluation dimensions
-│   │   ├── loader.py                   # YAML dimension loader
-│   │   └── custom/                     # User-uploaded custom dimensions
+│   │   ├── loader.py                   # YAML dimension loader (default + custom/)
+│   │   └── custom/                     # User-uploaded custom dimensions (via /api/governance/upload)
 │   ├── governance/
 │   │   ├── frameworks.py               # RAG-lite governance text (6 frameworks)
-│   │   └── doc_to_yaml_service.py      # Document → dimension extraction pipeline
+│   │   └── doc_to_yaml_service.py      # PDF/DOCX/TXT → dimension YAML extraction
 │   ├── services/
-│   │   └── evaluation_service.py       # Async job manager
-│   └── logs/                           # Evaluation audit logs (gitignored)
+│   │   ├── evaluation_service.py       # Async job manager + orchestrator selection + demo-mode runner
+│   │   ├── probe_service.py            # Live API probing + agent simulation via Claude
+│   │   ├── github_ingestion_service.py # Parse GitHub URL → fetch README/code → profile extraction
+│   │   └── pdf_service.py              # Server-side PDF report generation
+│   └── logs/                           # Evaluation audit logs (backend/logs/*.json is gitignored)
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/                      # LandingPage, EvaluatorPage, ResultsPage, DashboardPage, AboutPage
-│   │   ├── components/                 # Nav, Footer, VerdictBadge, SeverityBadge, Badge
+│   │   ├── pages/                      # LandingPage, EvaluatorPage, ResultsPage (8 tabs), DashboardPage, AboutPage
+│   │   ├── components/                 # Nav, Footer, VerdictBadge, SeverityBadge, Badge, SectionHead, CompanyIcon
+│   │   ├── utils/generatePDF.js        # Client-side PDF export template
 │   │   ├── theme.js                    # Design tokens (NYU Violet + UN Blue)
 │   │   ├── api.js                      # API client
-│   │   └── demoResult.js               # Demo evaluation data
-│   ├── public/                         # Static assets (favicon, photos)
+│   │   └── demoResult.js               # Frontend-side demo data for /results/demo routes
+│   ├── public/                         # Static assets
 │   └── package.json
+├── scripts/
+│   └── demo_verimedia.sh               # One-command demo verification script (invoked by `make demo`)
 ├── tests/
-│   ├── conftest.py                     # PYTHONPATH setup + test categorization docs
-│   ├── test_expert.py                  # Unit tests + live API expert tests
-│   ├── test_orchestrator.py            # Live API orchestrator tests
-│   └── test_api.py                     # Integration tests (require live server)
+│   ├── conftest.py                     # PYTHONPATH setup
+│   ├── test_expert.py                  # Expert JSON extraction + governance context
+│   ├── test_orchestrator.py            # Live-API orchestrator tests
+│   ├── test_api.py                     # Integration tests (require live server)
+│   ├── test_config.py                  # Placeholder detection + DEMO_MODE auto-detect
+│   ├── test_offline_provider.py        # OfflineProvider JSON shapes + real-orchestrator-in-demo spy
+│   ├── test_custom_dimensions.py       # Custom YAML flows through to demo-mode results
+│   ├── test_github_demo_ingestion.py   # Monkeypatched GitHub helpers, fact isolation between runs
+│   ├── test_output_specificity_enforcement.py  # Enforcer patches generic LLM output in place
+│   ├── test_validation.py              # POST /api/evaluate input validation (Bug 2)
+│   └── test_repo_cleanliness.py        # .gitignore + demo_data.py size + fixture round-trip
 ├── pytest.ini                          # Test markers (unit/integration/live_api)
-├── Makefile
+├── Makefile                            # dev/setup/run/install-frontend/test/demo/clean
 └── README.md
 ```
 
@@ -300,6 +389,7 @@ Shared infrastructure (`backend/models/schemas.py`, `backend/demo_data.py`, `tes
 | `LOCAL_ENDPOINT` | If local expert enabled | — | Your local LLM endpoint (no default — set to your own LM Studio / Ollama / vLLM URL) |
 | `LOCAL_MODEL` | If local expert enabled | — | Your local model name (no default) |
 | `LOCAL_API_KEY` | No | — | Optional bearer token for your local server |
+| `DEMO_MODE` | No | `auto` | `true` = force demo mode; `false` = force real mode; `auto` (default) = demo mode only when all three cloud API keys are missing or still set to `.env.example` placeholders |
 
 ---
 
@@ -331,25 +421,33 @@ Synthesis is the most demanding prompt in the system (long context, structured J
 
 ## Demo Mode (run without API keys)
 
-SafeCouncil includes a **demo mode** for evaluators who want to verify the full synthesis pipeline without configuring LLM API keys. When enabled, the backend executes the entire evaluation pipeline (job submission, status polling, audit logging, result retrieval) but skips actual LLM calls and returns a pre-built deliberative result with real arbitration artifacts (score changes, debate transcript, revision rationale).
+SafeCouncil's demo mode runs **the real `SimpleOrchestrator` pipeline end-to-end** without any LLM API keys. It is not a deepcopy of a pre-built JSON template — every step that would normally call an LLM (evaluate, critique, revise, position statement, synthesize) executes against an `OfflineProvider` that returns deterministic, expert-seeded JSON responses. The orchestrator's parallel `ThreadPoolExecutor` runs, the critique round produces real disagreements, the revision round emits real `score_changes`, and the synthesis step produces a real `debate_transcript` — all computed by orchestrator code paths, not hard-coded.
+
+The pre-built JSON templates under `backend/demo_fixtures/` exist only as a safety-net fallback if the offline orchestrator throws an exception.
 
 **Configuration via `DEMO_MODE` environment variable in `backend/.env`:**
 
 | Value | Behavior |
 |---|---|
 | `true` | Force demo mode regardless of API keys |
-| `false` | Force real mode — backend will fail evaluations if no keys are configured |
-| `auto` | (default) Demo mode ONLY when **all three** API keys are missing. As soon as you set even one key, real evaluation runs |
+| `false` | Force real mode — backend will fail evaluations if no real keys are configured |
+| `auto` | *(default)* Demo mode when all three cloud API keys are missing **OR still set to the `.env.example` placeholders** (`your_anthropic_api_key_here` etc.). As soon as you set even one real key, real evaluation runs |
+
+The auto detection treats placeholder values as "not set" so a first-time grader who runs `make setup` and never touches `.env` lands in demo mode automatically — the previous footgun where placeholder strings passed a `bool()` check is fixed.
 
 **For graders / first-time evaluators:**
 
 ```bash
-make setup       # creates an empty backend/.env
+make setup       # creates backend/.env from .env.example (empty keys)
 make install-frontend
 make dev         # starts backend + frontend
 ```
 
-Open the evaluator page → submit any agent → the synthesis pipeline runs end-to-end and returns a pre-built deliberative result with all arbitration artifacts. **No API keys required.**
+Open the evaluator page → submit any agent → the **real** SimpleOrchestrator runs end-to-end via the offline provider and returns a result with real arbitration artifacts. **No API keys required.** Or use the one-command path:
+
+```bash
+make demo        # runs a VeriMedia demo end-to-end and prints verdict + summary to stdout
+```
 
 **For developers switching modes:**
 
@@ -385,14 +483,15 @@ make test-all      # All tests including live API calls
 
 | Target | Description |
 |--------|-------------|
-| `make dev` | **Default** — start backend (:5000) + frontend (:3000) |
-| `make setup` | Create venv, install deps, copy .env.example |
+| `make dev` | **Default** — start backend (:5000) then poll `/api/health` until ready, then start frontend (:3000). Fails fast if backend doesn't come up within 30s. |
+| `make setup` | Create venv, install deps, copy `.env.example` (which ships with empty keys → DEMO_MODE auto-engages on first run) |
 | `make run` | Start backend server only |
 | `make install-frontend` | Install frontend dependencies |
 | `make run-frontend` | Start frontend dev server only |
 | `make test` | Run unit tests (no server, no API keys needed) |
 | `make test-api` | Run integration tests (requires live server) |
 | `make test-all` | Run all tests (requires server + API keys) |
+| `make demo` | **One-command grader path** — wipe `.env` so DEMO_MODE auto-engages, start backend, POST a VeriMedia evaluation, poll for completion, pretty-print verdict + executive summary + count of `score_changes` to prove the real orchestrator ran. Then stops the backend. No API keys required. |
 | `make clean` | Remove venv and cache files |
 
 ---
