@@ -37,17 +37,36 @@ def _validate_evaluation_input(data: dict) -> tuple[bool, str]:
     """
     Validate request body for POST /api/evaluate.
     Returns (is_valid: bool, error_message: str).
+
+    Accepts three equivalent ways to submit a GitHub-URL evaluation so
+    callers don't have to know the internal `api_probe` naming:
+      - {"input_method": "api_probe", "api_config": {"github_url": "..."}}
+      - {"input_method": "github", "github_url": "..."}
+      - {"input_method": "github", "api_config": {"github_url": "..."}}
+    When a GitHub URL is provided, the `conversations` field is optional
+    because the GitHubIngestionService generates conversations dynamically
+    from the repo's README + code files.
     """
     if not data.get("agent_name", "").strip():
         return False, "Please provide a name for the AI agent you want to evaluate."
 
-    input_method = data.get("input_method", "manual")
+    input_method = (data.get("input_method") or "manual").lower()
+
+    # Normalize the three GitHub-URL shapes into api_config.github_url
+    api_config = data.get("api_config") or {}
+    if not isinstance(api_config, dict):
+        api_config = {}
+    top_level_url = (data.get("github_url") or "").strip()
+    if input_method == "github" or top_level_url or api_config.get("github_url"):
+        if top_level_url and not api_config.get("github_url"):
+            api_config["github_url"] = top_level_url
+            data["api_config"] = api_config
+        # Any form of GitHub input → route through api_probe path, which
+        # lets the ingestion service generate conversations dynamically.
+        input_method = "api_probe"
+        data["input_method"] = "api_probe"
 
     if input_method == "api_probe":
-        api_config = data.get("api_config") or {}
-        # Catalog tools, GitHub URLs, and live API endpoints all use api_probe mode
-        if not isinstance(api_config, dict):
-            return False, "Please provide a tool, GitHub URL, or API endpoint."
         has_tool = bool(api_config.get("tool_id"))
         has_github = bool(api_config.get("github_url", "").strip())
         has_endpoint = bool(api_config.get("endpoint", "").strip())
@@ -55,6 +74,8 @@ def _validate_evaluation_input(data: dict) -> tuple[bool, str]:
             return False, "Please select a tool, paste a GitHub URL, or enter an API endpoint."
         if has_endpoint and not api_config.get("model", "").strip():
             return False, "Please enter the model name for the API you want to test (e.g., gpt-4o)."
+        # Conversations are optional for probe/catalog/github paths — the
+        # ingestion service will generate them from the target.
     else:
         conversations = data.get("conversations", [])
         if not conversations or not isinstance(conversations, list):
