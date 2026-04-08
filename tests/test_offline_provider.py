@@ -63,25 +63,35 @@ class TestOfflineProvider:
         assert len(data["debate_transcript"]) >= 4
         assert data["final_verdict"] in ("APPROVE", "REVIEW", "REJECT")
 
-    def test_three_experts_produce_different_framework_refs(self):
-        """Per-expert seeding must produce distinct framework citations."""
-        from experts.llm_providers.offline_provider import OfflineProvider
+    def test_three_experts_share_same_framework_pool_but_produce_different_scores(self):
+        """
+        Per project design: all experts evaluate with the SAME rubric, SAME
+        prompts, and the SAME framework pool. Disagreement comes from score
+        variance (model-level judgment), not from different lenses.
+        """
+        from experts.llm_providers.offline_provider import OfflineProvider, _SHARED_FRAMEWORKS
         user = "**Agent Name:** VeriMedia\n\nConversations..."
-        refs_per_expert = {}
+        results = {}
         for i in range(1, 4):
             p = OfflineProvider()
             p.bound_expert_name = f"Expert {i} (offline-deterministic)"
             resp = p.call("## EVALUATION RUBRIC", user)
-            data = json.loads(resp.text)
-            refs = {f.get("framework_ref") for f in data.get("findings", [])}
-            refs_per_expert[i] = refs
-        # Each expert should cite at least one framework
+            results[i] = json.loads(resp.text)
+
+        # All experts must produce dimension scores and findings.
         for i in (1, 2, 3):
-            assert refs_per_expert[i], f"Expert {i} produced no findings"
-        # Expert 1 (slot A) → NIST; Expert 2 (slot B) → EU AI Act; Expert 3 (slot C) → UNESCO
-        assert "NIST AI RMF" in refs_per_expert[1]
-        assert "EU AI Act" in refs_per_expert[2]
-        assert "UNESCO AI Ethics" in refs_per_expert[3]
+            assert results[i]["dimension_scores"], f"Expert {i} produced no scores"
+
+        # Per-expert overall scores must differ — that's what gives the
+        # critique round something to resolve.
+        overalls = {results[i]["overall_score"] for i in (1, 2, 3)}
+        assert len(overalls) >= 2, f"Expected score variance across experts, got {overalls}"
+
+        # All framework citations must come from the shared pool; NO
+        # framework should be uniquely tied to one expert.
+        for i in (1, 2, 3):
+            for f in results[i].get("findings", []):
+                assert f["framework_ref"] in _SHARED_FRAMEWORKS
 
 
 @pytest.mark.unit
