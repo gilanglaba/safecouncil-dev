@@ -138,7 +138,7 @@ class TestExpertEvaluation(unittest.TestCase):
         self.assertLessEqual(assessment.overall_score, 100)
 
     def test_evaluation_has_dimension_scores(self):
-        """Evaluation produces 15 dimension scores."""
+        """Evaluation produces at least 10 dimension scores (the default rubric size)."""
         assessment = self.expert.evaluate(self.eval_input, self.governance_context)
         self.assertGreaterEqual(
             len(assessment.dimension_scores), 10,
