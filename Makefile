@@ -76,7 +76,12 @@ clean:
 demo: $(VENV)
 	@$(PYTHON) -c "import dotenv" 2>/dev/null || $(PIP) install -r backend/requirements.txt
 	@echo ">>> Preparing demo environment (DEMO_MODE auto)..."
-	@cp backend/.env.example backend/.env
+	@if [ ! -f backend/.env ]; then \
+		cp backend/.env.example backend/.env; \
+		echo ">>> Created backend/.env from .env.example"; \
+	else \
+		echo ">>> backend/.env already exists — leaving it alone (use 'make demo-reset' to force)."; \
+	fi
 	@echo ">>> Starting backend on :5000 (logs: /tmp/sc.log)..."
 	@cd backend && ../$(PYTHON) app.py > /tmp/sc.log 2>&1 &
 	@sleep 3
@@ -84,3 +89,10 @@ demo: $(VENV)
 	@echo ">>> Stopping backend..."
 	@pkill -f "python app.py" 2>/dev/null || true
 	@pkill -f "python3 app.py" 2>/dev/null || true
+
+# Destructive reset: force backend/.env back to the template (wipes keys).
+# Use this only when you deliberately want a clean grader-style demo state.
+demo-reset:
+	@echo ">>> WARNING: overwriting backend/.env with .env.example (keys will be lost)"
+	@cp backend/.env.example backend/.env
+	@echo ">>> Done. backend/.env reset to template."
