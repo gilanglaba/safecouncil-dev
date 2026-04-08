@@ -35,10 +35,7 @@ DEFAULT_PROVIDERS = {
         "class": OpenAIProvider,
         "api_key_env": "LOCAL_API_KEY",
         "model_env": "LOCAL_MODEL",
-        "model_default": "local-model",
         "endpoint_env": "LOCAL_ENDPOINT",
-        "endpoint_default": "http://localhost:1234/v1",
-        "default_api_key": "lm-studio",
     },
 }
 
@@ -74,6 +71,21 @@ class ProviderRegistry:
         resolved_key = api_key or os.getenv(config["api_key_env"], "") or config.get("default_api_key", "")
         resolved_model = model or os.getenv(config.get("model_env", ""), config.get("model_default", ""))
         resolved_endpoint = endpoint or os.getenv(config.get("endpoint_env", ""), config.get("endpoint_default", ""))
+
+        # Local LLM has no defaults — fail fast with an actionable error if user
+        # enabled the local expert without configuring their own endpoint.
+        if provider_key == "local":
+            missing = []
+            if not resolved_endpoint:
+                missing.append("LOCAL_ENDPOINT")
+            if not resolved_model:
+                missing.append("LOCAL_MODEL")
+            if missing:
+                raise ValueError(
+                    f"Local LLM expert is enabled but {', '.join(missing)} is not set. "
+                    f"Add it to backend/.env (example: LOCAL_ENDPOINT=http://localhost:1234/v1, "
+                    f"LOCAL_MODEL=llama-3.1-8b-instruct) and restart the backend."
+                )
 
         kwargs = {
             "model": resolved_model,

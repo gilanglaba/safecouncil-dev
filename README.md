@@ -297,23 +297,27 @@ Shared infrastructure (`backend/models/schemas.py`, `backend/demo_data.py`, `tes
 | `CLAUDE_MODEL` | No | `claude-sonnet-4-20250514` | Claude model ID |
 | `OPENAI_MODEL` | No | `gpt-4o` | OpenAI model ID |
 | `GEMINI_MODEL` | No | `gemini-2.5-pro` | Gemini model ID |
-| `LOCAL_ENDPOINT` | No | `http://127.0.0.1:1234/v1` | Local LLM endpoint (LM Studio) |
-| `LOCAL_MODEL` | No | `local-model` | Local model name |
+| `LOCAL_ENDPOINT` | If local expert enabled | — | Your local LLM endpoint (no default — set to your own LM Studio / Ollama / vLLM URL) |
+| `LOCAL_MODEL` | If local expert enabled | — | Your local model name (no default) |
+| `LOCAL_API_KEY` | No | — | Optional bearer token for your local server |
 
 ---
 
 ## Local LLM Support
 
-SafeCouncil supports on-premise LLM evaluation via LM Studio or any OpenAI-compatible local endpoint. To use:
+SafeCouncil supports on-premise LLM evaluation via LM Studio, Ollama, vLLM, or any OpenAI-compatible local endpoint. **There is no default endpoint** — point SafeCouncil at your own server.
 
-1. Start LM Studio and load a model
-2. Add to `backend/.env`:
+1. Start your local LLM server and load a model
+2. Add to `backend/.env` (replace the example with your actual endpoint and model):
    ```
-   LOCAL_ENDPOINT=http://127.0.0.1:1234/v1
-   LOCAL_MODEL=your-model-name
-   LOCAL_API_KEY=lm-studio
+   LOCAL_ENDPOINT=http://localhost:1234/v1
+   LOCAL_MODEL=llama-3.1-8b-instruct
+   LOCAL_API_KEY=lm-studio        # optional — only if your server requires auth
    ```
-3. In the evaluation request, set an expert to `{"llm": "local", "enabled": true}`
+3. Restart the backend.
+4. In the evaluation request, set an expert to `{"llm": "local", "enabled": true}`.
+
+If you enable the local expert without setting `LOCAL_ENDPOINT` / `LOCAL_MODEL`, the backend fails fast with a clear error telling you which variable is missing.
 
 The system automatically adapts: compact prompts, reduced token limits, extended timeouts.
 
