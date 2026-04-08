@@ -122,14 +122,34 @@ def _classify_prompt(system_prompt: str, user_message: str) -> str:
     return "evaluate"
 
 
+# Per-agent repo-fact cache. The initial `evaluate` call sees the full
+# environment (with FILES: / README_EXCERPT: / architecture notes), but the
+# revision and synthesis prompts built by revision_prompt.py / synthesis_prompt.py
+# only interpolate agent_name — so extracting facts from their user_message
+# would return empty. We cache facts keyed by agent_name on the first
+# evaluate call and reuse them for every subsequent step in the pipeline.
+_FACTS_CACHE: dict = {}
+
+
+def _cache_facts(agent_name: str, facts: dict) -> None:
+    """Store facts for later critique/revise/synthesize calls."""
+    if agent_name and (facts.get("files") or facts.get("arch_lines") or facts.get("readme_excerpt")):
+        _FACTS_CACHE[agent_name] = dict(facts)
+
+
+def clear_facts_cache() -> None:
+    """Test helper — wipe the per-agent facts cache between runs."""
+    _FACTS_CACHE.clear()
+
+
 def _extract_repo_facts(user_message: str) -> dict:
     """
     Pull repo facts (files, agent name, architecture notes) out of the
     evaluation user_message so findings can cite real filenames.
 
-    The evaluation prompt interpolates eval_input.environment (which Fix 4
-    fills with architecture notes) and eval_input.agent_name. We also look
-    for a `FILES:` section that evaluation_service may inject for demo mode.
+    First tries to parse from the user_message (works for the initial
+    evaluate call which contains the full environment). Falls back to the
+    per-agent cache populated by earlier calls in the same pipeline.
     """
     facts = {"agent_name": "", "files": [], "arch_lines": [], "readme_excerpt": ""}
 
@@ -161,6 +181,19 @@ def _extract_repo_facts(user_message: str) -> dict:
     if m:
         facts["readme_excerpt"] = m.group(1)[:500].strip()
 
+    # If this prompt doesn't carry the repo facts (e.g. it's a critique/revise/
+    # synthesize prompt which only includes the agent name), fall back to the
+    # cache populated by the earlier evaluate call in the same pipeline.
+    agent = facts["agent_name"]
+    if agent and not (facts["files"] or facts["arch_lines"] or facts["readme_excerpt"]):
+        cached = _FACTS_CACHE.get(agent)
+        if cached:
+            for key in ("files", "arch_lines", "readme_excerpt"):
+                if not facts[key] and cached.get(key):
+                    facts[key] = cached[key]
+
+    # Cache for subsequent steps
+    _cache_facts(agent, facts)
     return facts
 
 
@@ -246,12 +279,25 @@ def _dim_detail(dim: str, score: int, agent_name: str, arch_lines: List[str], fi
 
 
 def _pick_weakness(dim: str, arch_lines: List[str], files: List[str]) -> str:
+    """
+    Pick evidence for a finding. Prefers LLM-extracted architecture_notes
+    (when the live GitHub ingestion path runs), falls back to citing an
+    actual repo file so demo-mode findings still reference real filenames.
+    """
     for line in arch_lines:
         lower = line.lower()
         if any(k in lower for k in ["upload", "auth", "rate limit", "validation", "audit", "logging", "csrf", "flask", "route", "endpoint", "gpt", "openai"]):
             return line
-    if files:
-        return f"observed in `{files[0]}` with no mitigations in place"
+
+    # Skip README/config files — prefer actual source code files for findings.
+    code_files = [
+        f for f in files
+        if not f.lower().startswith(("readme", "license", ".env", "package", "requirements"))
+        and f.lower().endswith((".py", ".js", ".ts", ".jsx", ".tsx"))
+    ]
+    target = code_files[0] if code_files else (files[0] if files else None)
+    if target:
+        return f"observed in `{target}` with no explicit mitigation visible in the source"
     return "no explicit mitigations observed in the codebase"
 
 
@@ -369,8 +415,26 @@ def _build_synthesize(user_message: str) -> dict:
     arch_lines = facts["arch_lines"]
     files = facts["files"]
 
-    topic1 = arch_lines[0] if arch_lines else "architectural audit trail gaps"
-    topic2 = arch_lines[1] if len(arch_lines) > 1 else "access control and input validation"
+    # Prefer real architectural observations if the live GitHub ingestion
+    # ran; otherwise cite actual files we fetched from the repo.
+    code_files = [
+        f for f in files
+        if not f.lower().startswith(("readme", "license"))
+        and f.lower().endswith((".py", ".js", ".ts", ".jsx", ".tsx"))
+    ]
+    if arch_lines:
+        topic1 = arch_lines[0]
+        topic2 = arch_lines[1] if len(arch_lines) > 1 else "access control and input validation"
+    elif code_files:
+        topic1 = f"audit trail gaps observed in `{code_files[0]}`"
+        topic2 = (
+            f"access control and input validation gaps in `{code_files[1]}`"
+            if len(code_files) > 1
+            else "access control and input validation"
+        )
+    else:
+        topic1 = "architectural audit trail gaps"
+        topic2 = "access control and input validation"
 
     transcript = [
         {"speaker": "Expert 1 (offline-deterministic)", "topic": "Architectural Gaps", "message": f"The primary concern for {agent_name} is {topic1}. This maps to a governance/record-keeping failure under the shared rubric.", "message_type": "argument"},

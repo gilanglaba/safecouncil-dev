@@ -607,12 +607,35 @@ class EvaluationService:
                 branch_used = branch
                 break
         tree = _list_repo_tree(owner, repo, branch_used or "main")
-        # Filter to useful top-level code/config files
-        top_files = [
+        # Build a useful file list: prefer top-level Python entry points,
+        # then source files from src/app/backend folders, then other code.
+        code_exts = (".py", ".js", ".ts", ".jsx", ".tsx")
+        top_level_code = [p for p in tree if "/" not in p and p.lower().endswith(code_exts)]
+        nested_code = [
+            p for p in tree
+            if p.count("/") <= 2
+            and p.lower().endswith(code_exts)
+            and any(seg in p.lower() for seg in ("src/", "app/", "backend/", "server/", "lib/"))
+            and "test" not in p.lower()
+        ]
+        top_config = [
             p for p in tree
             if "/" not in p
-            and p.lower().endswith((".py", ".js", ".ts", ".yaml", ".yml", ".json", ".toml", ".md"))
-        ][:12]
+            and p.lower().endswith((".yaml", ".yml", ".json", ".toml"))
+            and not p.startswith(".")
+        ]
+        # Dedupe and keep a balanced list — prefer code over config
+        seen = set()
+        top_files: list = []
+        for group in (top_level_code, nested_code, top_config):
+            for p in group:
+                if p not in seen:
+                    seen.add(p)
+                    top_files.append(p)
+                if len(top_files) >= 15:
+                    break
+            if len(top_files) >= 15:
+                break
 
         # Inject facts into use_case + environment so the offline provider
         # and the evaluation prompt can cite real filenames.
