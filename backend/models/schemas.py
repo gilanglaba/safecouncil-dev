@@ -346,6 +346,7 @@ class CouncilResult:
     synthesis_fallback: bool = False  # True if synthesis JSON parse failed and deterministic summary was used
     synthesizer_name: Optional[str] = None  # Which expert/provider ran synthesis
     executive_summary: Optional[str] = None  # Plain-English 3-5 sentence summary for non-technical readers
+    specificity: Optional[dict] = None  # Output specificity check + enforcement stats for the audit log
 
     def to_dict(self) -> dict:
         d = {
@@ -372,6 +373,7 @@ class CouncilResult:
                 "evaluation_time_seconds": round(self.evaluation_time_seconds, 1),
                 "synthesis_fallback": self.synthesis_fallback,
                 "synthesizer_name": self.synthesizer_name,
+                "specificity": self.specificity,
             },
         }
         return d
