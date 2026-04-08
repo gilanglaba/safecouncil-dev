@@ -55,6 +55,39 @@ Open http://localhost:3000 — the frontend proxies `/api/*` to the backend on p
 
 ---
 
+## How the Evaluation Works
+
+1. **Submit**: User provides agent details + conversation examples, pastes a GitHub URL, connects an API, or selects from the Tool Catalog
+2. **Queue**: Backend creates a job and returns `eval_id` immediately (202 Accepted)
+3. **Governance context**: RAG-lite lookup of selected frameworks (EU AI Act, NIST, OWASP, UNESCO, ISO 42001, UNICC)
+4. **Independent evaluation** *(parallel)*: Each expert evaluates the agent across **10 safety dimensions** in 5 categories
+5. **Cross-critique** *(deliberative only, parallel)*: Each expert reviews others' assessments, challenging score differences and surfacing missed risks
+6. **Score revision** *(deliberative only, parallel)*: Experts revise scores based on critiques, producing traceable `score_changes` with justifications
+7. **Final position statements** *(deliberative only, parallel)*: Each expert issues a final 2–4 sentence position after the critique round
+8. **Synthesis** *(deliberative only)*: One expert generates a debate transcript narrating the actual deliberation, plus agreements, disagreements, mitigations, and an **executive summary** for non-technical readers
+9. **Output specificity enforcement**: Deterministic post-processor scans every finding, dimension detail, and debate message. Any piece that doesn't reference the agent by name is patched in place using architecture notes / filenames pulled from `eval_input.environment`. Guarantees the final report is grounded in the actual agent regardless of LLM behavior. Enforcement stats surface in `audit.specificity`.
+10. **Verdict**: APPROVE / REVIEW / REJECT with prioritized mitigations
+11. **Audit log**: Complete JSON record saved to `backend/logs/{eval_id}.json` (gitignored)
+
+---
+
+## Input Methods
+
+SafeCouncil accepts AI agents through four input modes — pick whichever matches what you have:
+
+| Mode | What you provide | Best for |
+|---|---|---|
+| **1. Tool Catalog** | Click a pre-loaded agent (WFP Support Bot, VeriMedia, UNICEF/UNHCR/WHO simulations) | Demo users who want to see the full pipeline immediately |
+| **2. GitHub Repo URL** | Paste any public GitHub URL — SafeCouncil fetches the README + code, extracts an agent profile via Claude, and generates interface-appropriate test probes | Open-source AI agents, dynamic evaluation |
+| **3. Connect API** | A live HTTPS endpoint + auth header — SafeCouncil sends real probes to your running agent | Agents already deployed in staging/production |
+| **4. Upload Files** | A JSON or CSV of conversation pairs (`prompt` / `output`) | Offline transcript analysis, batch evaluations |
+
+**Try VeriMedia**: from the Tool Catalog, click **VeriMedia** — it routes to [github.com/FlashCarrot/VeriMedia](https://github.com/FlashCarrot/VeriMedia) and runs a full deliberative evaluation against the live repo. VeriMedia is a Flask-based AI media ethics analyzer with a GPT-4o backend; SafeCouncil's report specifically calls out its file upload surface and missing authentication layer as deployment-blocking findings.
+
+**Try GitHub URL ingestion**: under **GitHub Repo**, paste any public AI-agent repo URL — for example, try VeriMedia at [https://github.com/FlashCarrot/VeriMedia](https://github.com/FlashCarrot/VeriMedia). SafeCouncil ingests the README + code, infers the agent's interface (chat / API / file processor), generates appropriate test probes, and runs them against a Claude-simulated version of the agent — no live deployment required.
+
+---
+
 ## Architecture
 
 ```
@@ -223,39 +256,6 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
 
 ---
 
-## How the Evaluation Works
-
-1. **Submit**: User provides agent details + conversation examples, pastes a GitHub URL, connects an API, or selects from the Tool Catalog
-2. **Queue**: Backend creates a job and returns `eval_id` immediately (202 Accepted)
-3. **Governance context**: RAG-lite lookup of selected frameworks (EU AI Act, NIST, OWASP, UNESCO, ISO 42001, UNICC)
-4. **Independent evaluation** *(parallel)*: Each expert evaluates the agent across **10 safety dimensions** in 5 categories
-5. **Cross-critique** *(deliberative only, parallel)*: Each expert reviews others' assessments, challenging score differences and surfacing missed risks
-6. **Score revision** *(deliberative only, parallel)*: Experts revise scores based on critiques, producing traceable `score_changes` with justifications
-7. **Final position statements** *(deliberative only, parallel)*: Each expert issues a final 2–4 sentence position after the critique round
-8. **Synthesis** *(deliberative only)*: One expert generates a debate transcript narrating the actual deliberation, plus agreements, disagreements, mitigations, and an **executive summary** for non-technical readers
-9. **Output specificity enforcement**: Deterministic post-processor scans every finding, dimension detail, and debate message. Any piece that doesn't reference the agent by name is patched in place using architecture notes / filenames pulled from `eval_input.environment`. Guarantees the final report is grounded in the actual agent regardless of LLM behavior. Enforcement stats surface in `audit.specificity`.
-10. **Verdict**: APPROVE / REVIEW / REJECT with prioritized mitigations
-11. **Audit log**: Complete JSON record saved to `backend/logs/{eval_id}.json` (gitignored)
-
----
-
-## Input Methods
-
-SafeCouncil accepts AI agents through four input modes — pick whichever matches what you have:
-
-| Mode | What you provide | Best for |
-|---|---|---|
-| **1. Tool Catalog** | Click a pre-loaded agent (WFP Support Bot, VeriMedia, UNICEF/UNHCR/WHO simulations) | Demo users who want to see the full pipeline immediately |
-| **2. GitHub Repo URL** | Paste any public GitHub URL — SafeCouncil fetches the README + code, extracts an agent profile via Claude, and generates interface-appropriate test probes | Open-source AI agents, dynamic evaluation |
-| **3. Connect API** | A live HTTPS endpoint + auth header — SafeCouncil sends real probes to your running agent | Agents already deployed in staging/production |
-| **4. Upload Files** | A JSON or CSV of conversation pairs (`prompt` / `output`) | Offline transcript analysis, batch evaluations |
-
-**Try VeriMedia**: from the Tool Catalog, click **VeriMedia** — it routes to [github.com/FlashCarrot/VeriMedia](https://github.com/FlashCarrot/VeriMedia) and runs a full deliberative evaluation against the live repo. VeriMedia is a Flask-based AI media ethics analyzer with a GPT-4o backend; SafeCouncil's report specifically calls out its file upload surface and missing authentication layer as deployment-blocking findings.
-
-**Try GitHub URL ingestion**: under **GitHub Repo**, paste any public AI-agent repo URL — for example, try VeriMedia at [https://github.com/FlashCarrot/VeriMedia](https://github.com/FlashCarrot/VeriMedia). SafeCouncil ingests the README + code, infers the agent's interface (chat / API / file processor), generates appropriate test probes, and runs them against a Claude-simulated version of the agent — no live deployment required.
-
----
-
 ## Results Page
 
 Every result lives at `/results/{eval_id}` with a layout designed for two very different readers in one page: UN/IGO policy officers (plain-language, no jargon) and AI/ML reviewers (per-expert scores, debate transcript, evidence log).
@@ -356,20 +356,6 @@ safecouncil/
 ├── Makefile                            # dev/setup/run/install-frontend/test/demo/clean
 └── README.md
 ```
-
----
-
-## Project Contributors
-
-SafeCouncil is a 3-student capstone where each contributor owns a distinct project area. The codebase is organized so each student's work maps to a clear set of modules:
-
-| Contributor | Project Area | Owns these modules |
-|---|---|---|
-| **Pengyun (Jimmy) Ma** | Platform & Infrastructure | `backend/config.py`, `backend/governance/`, `backend/dimensions/`, `backend/services/github_ingestion_service.py`, `backend/experts/llm_providers/` (provider abstractions, local LLM support, modular architecture) |
-| **Gilang Laba** | AI Orchestration & Synthesis | `backend/orchestrators/`, `backend/experts/expert.py`, `backend/experts/base_expert.py`, `backend/prompts/` (council-of-experts, deliberative pipeline, cross-critique, score revision, synthesis) |
-| **Iris Zhang** | UX & Integration | `frontend/`, `backend/services/evaluation_service.py`, `backend/app.py` (React UI, evaluator/results pages, API integration, end-to-end user flow) |
-
-Shared infrastructure (`backend/models/schemas.py`, `backend/demo_data.py`, `tests/`, `Makefile`) is owned jointly. The three projects integrate through the platform's modular architecture — each layer can be developed and tested independently.
 
 ---
 
@@ -501,6 +487,21 @@ make test-all      # All tests including live API calls
 - **NYU SPS × UNICC AI Governance Capstone** — Spring 2026
 - Governance frameworks: EU AI Act, NIST AI RMF, UNESCO AI Ethics, OWASP Top 10 for LLMs, ISO 42001, UNICC AI Governance
 
+---
+
+## Project Contributors
+
+SafeCouncil is a 3-student capstone where each contributor owns a distinct project area. The codebase is organized so each student's work maps to a clear set of modules:
+
+| Contributor | Project Area | Owns these modules |
+|---|---|---|
+| **Pengyun (Jimmy) Ma** | Platform & Infrastructure | `backend/config.py`, `backend/governance/`, `backend/dimensions/`, `backend/services/github_ingestion_service.py`, `backend/experts/llm_providers/` (provider abstractions, local LLM support, modular architecture) |
+| **Gilang Laba** | AI Orchestration & Synthesis | `backend/orchestrators/`, `backend/experts/expert.py`, `backend/experts/base_expert.py`, `backend/prompts/` (council-of-experts, deliberative pipeline, cross-critique, score revision, synthesis) |
+| **Iris Zhang** | UX & Integration | `frontend/`, `backend/services/evaluation_service.py`, `backend/app.py` (React UI, evaluator/results pages, API integration, end-to-end user flow) |
+
+Shared infrastructure (`backend/models/schemas.py`, `backend/demo_data.py`, `tests/`, `Makefile`) is owned jointly. The three projects integrate through the platform's modular architecture — each layer can be developed and tested independently.
+
+---
 ## License
 
 MIT License — see LICENSE for details.
