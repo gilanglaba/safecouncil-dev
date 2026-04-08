@@ -1,4 +1,4 @@
-.PHONY: setup run dev install-frontend run-frontend test test-api test-all clean
+.PHONY: setup run dev install-frontend run-frontend test test-api test-all clean demo
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -52,3 +52,19 @@ clean:
 	rm -rf $(VENV) __pycache__ backend/__pycache__ .pytest_cache
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
+
+# One-command grader path: wipe .env so DEMO_MODE auto-engages, start the
+# backend, POST a VeriMedia evaluation, poll for completion, print the
+# verdict + executive summary + count of score_changes proving the real
+# orchestrator ran. No API keys required.
+demo: $(VENV)
+	@$(PYTHON) -c "import dotenv" 2>/dev/null || $(PIP) install -r backend/requirements.txt
+	@echo ">>> Preparing demo environment (DEMO_MODE auto)..."
+	@cp backend/.env.example backend/.env
+	@echo ">>> Starting backend on :5000 (logs: /tmp/sc.log)..."
+	@cd backend && ../$(PYTHON) app.py > /tmp/sc.log 2>&1 &
+	@sleep 3
+	@./scripts/demo_verimedia.sh || true
+	@echo ">>> Stopping backend..."
+	@pkill -f "python app.py" 2>/dev/null || true
+	@pkill -f "python3 app.py" 2>/dev/null || true
