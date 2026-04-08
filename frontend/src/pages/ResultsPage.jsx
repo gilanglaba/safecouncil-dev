@@ -1122,8 +1122,132 @@ function EvidenceLogTab({ result }) {
 // Results View
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Reader Mode (Stakeholder View) ────────────────────────────────────────
+// Collapses the dense 7-tab technical report into a single scrollable page
+// with just what a non-technical UNICC stakeholder needs: executive summary,
+// verdict, top plain-language risks, top plain-language mitigations.
+// Toggled from the top of the ResultsView; default ON for new results.
+function StakeholderView({ result }) {
+  const verdict = result.verdict || {};
+  const vc = {
+    APPROVE: { bg: theme.greenPale, text: theme.green, border: theme.greenBorder },
+    REVIEW: { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder },
+    REJECT: { bg: theme.redPale, text: theme.red, border: theme.redBorder },
+  }[verdict.final_verdict] || { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder };
+
+  // Pick top plain-language items across all experts (dedupe by dimension)
+  const allFindings = (result.expert_assessments || []).flatMap((a) => a.findings || []);
+  const sevRank = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+  const sortedFindings = [...allFindings].sort((a, b) => {
+    const as = typeof a.severity === "string" ? a.severity : a.severity?.value;
+    const bs = typeof b.severity === "string" ? b.severity : b.severity?.value;
+    return (sevRank[as] ?? 4) - (sevRank[bs] ?? 4);
+  });
+  const seenDims = new Set();
+  const topFindings = [];
+  for (const f of sortedFindings) {
+    if (seenDims.has(f.dimension)) continue;
+    seenDims.add(f.dimension);
+    if (f.plain_summary || f.text) topFindings.push(f);
+    if (topFindings.length >= 3) break;
+  }
+
+  const mitigations = result.mitigations || [];
+  const topMits = mitigations.slice(0, 3);
+
+  return (
+    <div>
+      {/* Big verdict ribbon */}
+      <div
+        style={{
+          background: vc.bg,
+          border: `1px solid ${vc.border}`,
+          borderRadius: theme.radiusMd,
+          padding: "18px 24px",
+          marginBottom: 20,
+          display: "flex",
+          alignItems: "center",
+          gap: 18,
+        }}
+      >
+        <VerdictBadge verdict={verdict.final_verdict} size="lg" />
+        <div style={{ color: vc.text, fontSize: 14, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+            Council Recommendation
+          </div>
+          <div>
+            Confidence <strong>{verdict.confidence ?? "—"}%</strong> · Agreement <strong>{verdict.agreement_rate ?? "—"}%</strong>
+            {verdict.final_verdict && " · "}
+            {verdict.final_verdict && (VERDICT_EXPLANATIONS[verdict.final_verdict] || "")}
+          </div>
+        </div>
+      </div>
+
+      {/* Top risks in plain language */}
+      {topFindings.length > 0 && (
+        <div style={{
+          background: "#FFFFFF",
+          border: `1px solid ${theme.border}`,
+          borderRadius: theme.radiusMd,
+          padding: "20px 24px",
+          marginBottom: 20,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+            Top Risks (plain language)
+          </div>
+          <ol style={{ margin: 0, paddingLeft: 22, lineHeight: 1.7 }}>
+            {topFindings.map((f, i) => (
+              <li key={i} style={{ marginBottom: 12, fontSize: 15, color: theme.text }}>
+                <span style={{ fontWeight: 600 }}>{f.dimension}</span>
+                <span style={{ marginLeft: 8, fontSize: 10, padding: "2px 6px", borderRadius: 4, background: theme.amberPale, color: theme.amber, fontWeight: 700 }}>
+                  {typeof f.severity === "string" ? f.severity : f.severity?.value}
+                </span>
+                <div style={{ marginTop: 4, color: theme.textSec, fontSize: 14 }}>
+                  {f.plain_summary || f.text}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {/* Top mitigations in plain language */}
+      {topMits.length > 0 && (
+        <div style={{
+          background: "#FFFFFF",
+          border: `1px solid ${theme.border}`,
+          borderLeft: `4px solid ${theme.unBlue}`,
+          borderRadius: theme.radiusMd,
+          padding: "20px 24px",
+          marginBottom: 20,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: theme.unBlueDark, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+            Recommended Next Steps
+          </div>
+          <ol style={{ margin: 0, paddingLeft: 22, lineHeight: 1.7 }}>
+            {topMits.map((m, i) => (
+              <li key={i} style={{ marginBottom: 10, fontSize: 15, color: theme.text }}>
+                <span style={{ marginRight: 8, fontSize: 11, padding: "2px 7px", borderRadius: 4, background: theme.violetPale, color: theme.violet, fontWeight: 700 }}>
+                  {m.priority}
+                </span>
+                {m.plain_summary || m.text}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {/* Footer hint */}
+      <div style={{ fontSize: 12, color: theme.textTer, textAlign: "center", marginTop: 8 }}>
+        This is the Reader view. Toggle off "Reader mode" at the top of the page to see the full technical report, including per-expert scores, evidence logs, and the debate transcript.
+      </div>
+    </div>
+  );
+}
+
 function ResultsView({ result, onDownloadPDF }) {
   const [activeTab, setActiveTab] = useState("overview");
+  const [readerMode, setReaderMode] = useState(true);
   const verdict = result.verdict || {};
   const verdictColors = {
     APPROVE: { bg: theme.greenPale, text: theme.green, border: theme.greenBorder },
@@ -1151,6 +1275,52 @@ function ResultsView({ result, onDownloadPDF }) {
 
   return (
     <div>
+      {/* Reader mode toggle — lets non-technical readers collapse to the
+          stakeholder view, and lets technical users expand to the full report */}
+      <div style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 12,
+      }}>
+        <span style={{ fontSize: 11, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
+          View:
+        </span>
+        <button
+          onClick={() => setReaderMode(true)}
+          style={{
+            padding: "6px 14px",
+            borderRadius: 6,
+            border: `1px solid ${readerMode ? theme.violet : theme.border}`,
+            background: readerMode ? theme.violet : "#FFFFFF",
+            color: readerMode ? "#FFFFFF" : theme.textSec,
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: theme.transition,
+          }}
+        >
+          Reader mode
+        </button>
+        <button
+          onClick={() => setReaderMode(false)}
+          style={{
+            padding: "6px 14px",
+            borderRadius: 6,
+            border: `1px solid ${!readerMode ? theme.violet : theme.border}`,
+            background: !readerMode ? theme.violet : "#FFFFFF",
+            color: !readerMode ? "#FFFFFF" : theme.textSec,
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: theme.transition,
+          }}
+        >
+          Full technical report
+        </button>
+      </div>
+
       {/* Executive summary — plain-English, for non-technical readers */}
       {result.executive_summary && (
         <div
@@ -1254,47 +1424,53 @@ function ResultsView({ result, onDownloadPDF }) {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: 2,
-          marginBottom: 24,
-          borderBottom: `2px solid ${theme.border}`,
-          overflowX: "auto",
-        }}
-      >
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+      {readerMode ? (
+        <StakeholderView result={result} />
+      ) : (
+        <>
+          {/* Tabs */}
+          <div
             style={{
-              padding: "10px 18px",
-              background: "none",
-              border: "none",
-              borderBottom: `2px solid ${activeTab === tab.id ? theme.violet : "transparent"}`,
-              marginBottom: -2,
-              fontSize: 14,
-              fontWeight: activeTab === tab.id ? 700 : 500,
-              color: activeTab === tab.id ? theme.violet : theme.textSec,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              transition: theme.transition,
+              display: "flex",
+              gap: 2,
+              marginBottom: 24,
+              borderBottom: `2px solid ${theme.border}`,
+              overflowX: "auto",
             }}
           >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: "10px 18px",
+                  background: "none",
+                  border: "none",
+                  borderBottom: `2px solid ${activeTab === tab.id ? theme.violet : "transparent"}`,
+                  marginBottom: -2,
+                  fontSize: 14,
+                  fontWeight: activeTab === tab.id ? 700 : 500,
+                  color: activeTab === tab.id ? theme.violet : theme.textSec,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: theme.transition,
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-      {/* Tab content */}
-      {activeTab === "overview" && <OverviewTab result={result} />}
-      {activeTab === "scores" && <ScoreComparisonTab result={result} />}
-      {activeTab === "compliance" && <ComplianceTab result={result} />}
-      {activeTab === "evidence" && <EvidenceLogTab result={result} />}
-      {activeTab === "council" && (isDeliberative ? <DeliberationTab result={result} /> : <ExpertComparisonTab result={result} />)}
-      {activeTab === "findings" && <FindingsTab result={result} />}
-      {activeTab === "actions" && <ActionItemsTab result={result} onDownloadPDF={onDownloadPDF} />}
+          {/* Tab content */}
+          {activeTab === "overview" && <OverviewTab result={result} />}
+          {activeTab === "scores" && <ScoreComparisonTab result={result} />}
+          {activeTab === "compliance" && <ComplianceTab result={result} />}
+          {activeTab === "evidence" && <EvidenceLogTab result={result} />}
+          {activeTab === "council" && (isDeliberative ? <DeliberationTab result={result} /> : <ExpertComparisonTab result={result} />)}
+          {activeTab === "findings" && <FindingsTab result={result} />}
+          {activeTab === "actions" && <ActionItemsTab result={result} onDownloadPDF={onDownloadPDF} />}
+        </>
+      )}
     </div>
   );
 }
