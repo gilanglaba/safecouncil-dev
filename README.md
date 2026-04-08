@@ -171,113 +171,7 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
 | `POST` | `/api/governance/upload` | Upload governance document, extract dimensions YAML |
 | `POST` | `/api/governance/confirm` | Save reviewed custom dimensions YAML to `backend/dimensions/custom/` |
 
-### POST /api/evaluate
-
-```json
-{
-  "agent_name": "WFP Customer Support Bot v2.1",
-  "use_case": "Automated customer support for humanitarian aid...",
-  "system_prompt": "You are a helpful customer support assistant...",
-  "conversations": [
-    {
-      "label": "Normal inquiry",
-      "prompt": "I haven't received my food package...",
-      "output": "I'm sorry to hear that. Let me look into this..."
-    }
-  ],
-  "environment": "Cloud-hosted, web chat",
-  "data_sensitivity": "High",
-  "frameworks": ["eu_ai_act", "nist", "owasp", "unesco"],
-  "experts": [
-    {"llm": "claude", "enabled": true},
-    {"llm": "gpt4o", "enabled": true},
-    {"llm": "gemini", "enabled": true}
-  ],
-  "orchestration_method": "deliberative",
-  "synthesis_provider": "claude"
-}
-```
-
-- `orchestration_method`: `"deliberative"` (default) or `"aggregate"`.
-- `synthesis_provider` *(optional)*: `"claude"` / `"gpt4o"` / `"gemini"` / `"local"`. Lets you run cross-critique on cloud LLMs while keeping the final synthesis report on your own hardware (or vice versa). Defaults to the first council expert.
-- **GitHub URL shortcut**: any of these three shapes works, no `conversations` required:
-  - `{"input_method": "github", "github_url": "https://github.com/..."}` *(shortest)*
-  - `{"input_method": "github", "api_config": {"github_url": "..."}}`
-  - `{"input_method": "api_probe", "api_config": {"github_url": "..."}}` *(canonical)*
-- `experts[].llm` also accepts `"offline"` for the deterministic demo provider. The server automatically uses `offline` when `DEMO_MODE` is active.
-
-### Response Structure
-
-```json
-{
-  "eval_id": "a1b2c3d4",
-  "agent_name": "...",
-  "orchestrator_method": "deliberative",
-  "timestamp": "2026-04-08T14:00:00Z",
-  "executive_summary": "SafeCouncil reviewed VeriMedia and concluded it needs changes before it can be deployed safely. The most urgent issues are audit trail gaps observed in app.py and access control in finetune.py. Recommended next step: implement server-side audit logging...",
-  "verdict": {
-    "final_verdict": "REVIEW",
-    "confidence": 87,
-    "agreement_rate": 84
-  },
-  "expert_assessments": [...],
-  "debate_transcript": [...],
-  "agreements": [...],
-  "disagreements": [...],
-  "mitigations": [...],
-  "audit": {
-    "total_api_calls": 13,
-    "total_tokens_used": 40000,
-    "total_cost_usd": 0.18,
-    "evaluation_time_seconds": 180.0,
-    "demo_mode": false,
-    "synthesis_fallback": false,
-    "synthesizer_name": "Expert 1 (claude-sonnet-4-20250514)",
-    "specificity": {
-      "agent_name_referenced": true,
-      "conversation_evidence_cited": true,
-      "debate_transcript_present": true,
-      "enforcement": {
-        "findings_text_patched": 0,
-        "findings_evidence_patched": 0,
-        "debate_messages_patched": 0,
-        "dimension_details_patched": 0
-      }
-    }
-  }
-}
-```
-
-- **`executive_summary`** — plain-English 3–5 sentence summary for non-technical readers, rendered as a persistent card above every tab on the Results page.
-- **`audit.demo_mode`** — `true` when the evaluation ran offline via `OfflineProvider`.
-- **`audit.synthesis_fallback`** — `true` if the synthesizer's JSON couldn't be parsed and a deterministic fallback summary was used.
-- **`audit.synthesizer_name`** — which expert generated the synthesis (useful when the synthesis provider differs from the council experts).
-- **`audit.specificity.enforcement`** — count of findings/debate messages that the output-specificity enforcer patched in place to guarantee agent-specific references, regardless of what the LLM returned.
-
----
-
-## Results Page
-
-Every result lives at `/results/{eval_id}` with a layout designed for two very different readers in one page: UN/IGO policy officers (plain-language, no jargon) and AI/ML reviewers (per-expert scores, debate transcript, evidence log).
-
-**Persistent header** (visible on every tab):
-- **Verdict banner** — APPROVE / REVIEW / REJECT with confidence + agreement rate, method tag, and a short narrative explanation
-- **Executive Summary card** — plain-English 3–5 sentence summary of the council's findings. Sits directly below the verdict banner and renders on every tab, so the stakeholder view is always one glance away.
-
-**8 tabs** (default active tab = **Overview**, the plain-language landing):
-
-| Tab | Content | Primary audience |
-|---|---|---|
-| **Overview** | Top 3 risks in plain language + top 3 recommended next steps (numbered cards) | Non-technical stakeholders |
-| **Expert Panel** | Per-expert cards with initial → final scores, revision rationales, Council Consensus + Points of Contention | Reviewers tracking per-expert reasoning |
-| **Score Comparison** | 10 dimensions × N experts score matrix with hover tooltips | Analysts comparing expert disagreement |
-| **Compliance** | Per-framework pass / partial / fail derived from findings | Governance / legal |
-| **Evidence Log** | Numbered probe/response conversations, amber-highlighted when a finding is attached | Auditors |
-| **Council Deliberation** *(deliberative)* / **Expert Comparison** *(aggregate)* | Full debate transcript with topic dividers and speaker filters, or side-by-side expert comparison for aggregate method | Method researchers |
-| **All Findings** | Severity-grouped finding list with source-conversation drilldown | Security reviewers |
-| **Action Items** | Prioritized mitigations in plain language, PDF download button | Engineering |
-
-The **Overview tab is the default** so a non-technical reader lands on the plain-language view; technical users click into the other tabs for depth. No view-mode toggle is needed — progressive disclosure happens through normal tab navigation.
+Request and response shapes are defined as Python dataclasses in `backend/models/schemas.py` (`EvaluationInput` for the request body, `CouncilResult` for the response). The frontend uses these via `frontend/src/api.js`.
 
 ---
 
@@ -379,32 +273,6 @@ safecouncil/
 
 ---
 
-## Local LLM Support
-
-SafeCouncil supports on-premise LLM evaluation via LM Studio, Ollama, vLLM, or any OpenAI-compatible local endpoint. **There is no default endpoint** — point SafeCouncil at your own server.
-
-1. Start your local LLM server and load a model
-2. Add to `backend/.env` (replace the example with your actual endpoint and model):
-   ```
-   LOCAL_ENDPOINT=http://localhost:1234/v1
-   LOCAL_MODEL=llama-3.1-8b-instruct
-   LOCAL_API_KEY=lm-studio        # optional — only if your server requires auth
-   ```
-3. Restart the backend.
-4. In the evaluation request, set an expert to `{"llm": "local", "enabled": true}`.
-
-If you enable the local expert without setting `LOCAL_ENDPOINT` / `LOCAL_MODEL`, the backend fails fast with a clear error telling you which variable is missing.
-
-The system automatically adapts: compact prompts, reduced token limits, extended timeouts.
-
-### On-premise synthesis (cloud evaluation, on-prem report)
-
-SafeCouncil also supports running **only the synthesis step** on a local LLM while keeping cross-critique evaluation on cloud APIs (or vice versa). On the Evaluator page under "Council Method", switch **Synthesis runs on** to **On-Premise (local LLM)** to route the final report generation to your `LOCAL_ENDPOINT`. This is useful for UN/IGO scenarios where the consolidated verdict document must stay on your hardware even when evaluation runs cloud.
-
-Synthesis is the most demanding prompt in the system (long context, structured JSON output). It works best with 70B-class local models (Llama 3.1 70B, Qwen 2.5 72B). Smaller models may produce truncated reports — if local synthesis fails JSON parsing, SafeCouncil automatically falls back to a deterministic summary and surfaces a warning badge in the result page.
-
----
-
 ## Demo Mode (run without API keys)
 
 SafeCouncil's demo mode runs **the real `SimpleOrchestrator` pipeline end-to-end** without any LLM API keys. It is not a deepcopy of a pre-built JSON template — every step that would normally call an LLM (evaluate, critique, revise, position statement, synthesize) executes against an `OfflineProvider` that returns deterministic, expert-seeded JSON responses. The orchestrator's parallel `ThreadPoolExecutor` runs, the critique round produces real disagreements, the revision round emits real `score_changes`, and the synthesis step produces a real `debate_transcript` — all computed by orchestrator code paths, not hard-coded.
@@ -419,9 +287,9 @@ The pre-built JSON templates under `backend/demo_fixtures/` exist only as a safe
 | `false` | Force real mode — backend will fail evaluations if no real keys are configured |
 | `auto` | *(default)* Demo mode when all three cloud API keys are missing **OR still set to the `.env.example` placeholders** (`your_anthropic_api_key_here` etc.). As soon as you set even one real key, real evaluation runs |
 
-The auto detection treats placeholder values as "not set" so a first-time grader who runs `make setup` and never touches `.env` lands in demo mode automatically — the previous footgun where placeholder strings passed a `bool()` check is fixed.
+The auto detection treats placeholder values as "not set" so a first-time user who runs `make setup` and never touches `.env` lands in demo mode automatically.
 
-**For graders / first-time evaluators:**
+**Try it without any API keys:**
 
 ```bash
 make setup       # creates backend/.env from .env.example (empty keys)
@@ -429,7 +297,7 @@ make install-frontend
 make dev         # starts backend + frontend
 ```
 
-Open the evaluator page → submit any agent → the **real** SimpleOrchestrator runs end-to-end via the offline provider and returns a result with real arbitration artifacts. **No API keys required.** Or use the one-command path:
+Open the Evaluate page → submit any agent → the real SimpleOrchestrator runs end-to-end via the offline provider and returns a result with real arbitration artifacts. **No API keys required.** Or use the one-command path:
 
 ```bash
 make demo        # runs a VeriMedia demo end-to-end and prints verdict + summary to stdout
@@ -477,7 +345,7 @@ make test-all      # All tests including live API calls
 | `make test` | Run unit tests (no server, no API keys needed) |
 | `make test-api` | Run integration tests (requires live server) |
 | `make test-all` | Run all tests (requires server + API keys) |
-| `make demo` | **One-command grader path** — wipe `.env` so DEMO_MODE auto-engages, start backend, POST a VeriMedia evaluation, poll for completion, pretty-print verdict + executive summary + count of `score_changes` to prove the real orchestrator ran. Then stops the backend. No API keys required. |
+| `make demo` | **One-command demo path** — wipe `.env` so DEMO_MODE auto-engages, start the backend, POST a VeriMedia evaluation, poll for completion, pretty-print verdict + executive summary + `score_changes` count, then stop the backend. No API keys required. |
 | `make clean` | Remove venv and cache files |
 
 ---
@@ -497,7 +365,7 @@ SafeCouncil is a 3-student capstone where each contributor owns a distinct proje
 |---|---|---|
 | **Pengyun (Jimmy) Ma** | Platform & Infrastructure | `backend/config.py`, `backend/governance/`, `backend/dimensions/`, `backend/services/github_ingestion_service.py`, `backend/experts/llm_providers/` (provider abstractions, local LLM support, modular architecture) |
 | **Gilang Laba** | AI Orchestration & Synthesis | `backend/orchestrators/`, `backend/experts/expert.py`, `backend/experts/base_expert.py`, `backend/prompts/` (council-of-experts, deliberative pipeline, cross-critique, score revision, synthesis) |
-| **Iris Zhang** | UX & Integration | `frontend/`, `backend/services/evaluation_service.py`, `backend/app.py` (React UI, evaluator/results pages, API integration, end-to-end user flow) |
+| **Iris Zhang** | UX & Integration | `frontend/`, `backend/services/evaluation_service.py`, `backend/app.py` (React UI, evaluate/results pages, API integration, end-to-end user flow) |
 
 Shared infrastructure (`backend/models/schemas.py`, `backend/demo_data.py`, `tests/`, `Makefile`) is owned jointly. The three projects integrate through the platform's modular architecture — each layer can be developed and tested independently.
 
