@@ -5,6 +5,7 @@ from experts.llm_providers.base_provider import LLMProvider
 from experts.llm_providers.anthropic_provider import AnthropicProvider
 from experts.llm_providers.openai_provider import OpenAIProvider
 from experts.llm_providers.google_provider import GoogleProvider
+from experts.llm_providers.offline_provider import OfflineProvider
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,14 @@ DEFAULT_PROVIDERS = {
         "model_env": "LOCAL_MODEL",
         "endpoint_env": "LOCAL_ENDPOINT",
     },
+    # Deterministic offline provider — powers DEMO_MODE by letting the real
+    # orchestrator pipeline run end-to-end without any API keys. Returns
+    # dimension-aware, expert-seeded JSON for evaluate/critique/revise/synthesize.
+    "offline": {
+        "class": OfflineProvider,
+        "api_key_env": "",
+        "model_default": "offline-deterministic",
+    },
 }
 
 
@@ -68,7 +77,7 @@ class ProviderRegistry:
         provider_class = config["class"]
 
         # Resolve at call time (not import time) so .env is loaded
-        resolved_key = api_key or os.getenv(config["api_key_env"], "") or config.get("default_api_key", "")
+        resolved_key = api_key or os.getenv(config.get("api_key_env", "") or "_NO_SUCH_ENV", "") or config.get("default_api_key", "")
         resolved_model = model or os.getenv(config.get("model_env", ""), config.get("model_default", ""))
         resolved_endpoint = endpoint or os.getenv(config.get("endpoint_env", ""), config.get("endpoint_default", ""))
 
