@@ -458,7 +458,7 @@ if __name__ == "__main__":
     # Ensure log directory exists
     os.makedirs(Config.LOG_DIR, exist_ok=True)
 
-    logger.info(f"Starting SafeCouncil API v{Config.VERSION}")
+    logger.info(f"SafeCouncil starting | version={Config.VERSION} | DEMO_MODE={Config.DEMO_MODE}")
     logger.info(f"API keys configured: {Config.check_api_keys()}")
     logger.info(f"Log directory: {Config.LOG_DIR}")
 

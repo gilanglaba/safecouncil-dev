@@ -1,7 +1,28 @@
+import logging
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
+_config_logger = logging.getLogger(__name__)
+
+
+def _is_real_key(value: str) -> bool:
+    """
+    Return True only if `value` looks like a real API key — not empty, and
+    not a placeholder like `your_anthropic_api_key_here` that ships in
+    .env.example. Used by DEMO_MODE auto-detection so first-timers who run
+    `make setup` land in demo mode instead of degraded mode.
+    """
+    v = (value or "").strip()
+    if not v:
+        return False
+    # Common placeholder patterns: `your_*_here`, `changeme`, `xxx...`
+    if v.lower().startswith("your_") and v.lower().endswith("_here"):
+        return False
+    if v.lower() in ("changeme", "placeholder", "none", "null"):
+        return False
+    return True
 
 
 class Config:
@@ -34,13 +55,16 @@ class Config:
             return True
         if mode == "false":
             return False
-        # auto: enable demo only when ALL three LLM keys are missing
-        no_keys = not (
-            os.getenv("ANTHROPIC_API_KEY", "").strip()
-            or os.getenv("OPENAI_API_KEY", "").strip()
-            or os.getenv("GOOGLE_API_KEY", "").strip()
+        # auto: enable demo only when ALL three LLM keys are missing OR
+        # still set to the .env.example placeholders. Using _is_real_key
+        # prevents the "your_anthropic_api_key_here" footgun that left
+        # first-timers in degraded mode after `make setup`.
+        no_real_keys = not (
+            _is_real_key(os.getenv("ANTHROPIC_API_KEY", ""))
+            or _is_real_key(os.getenv("OPENAI_API_KEY", ""))
+            or _is_real_key(os.getenv("GOOGLE_API_KEY", ""))
         )
-        return no_keys
+        return no_real_keys
 
     DEMO_MODE = _compute_demo_mode.__func__()
 
@@ -65,11 +89,11 @@ class Config:
 
     @classmethod
     def check_api_keys(cls):
-        """Return dict of which API keys are configured."""
+        """Return dict of which API keys are configured (ignoring placeholders)."""
         return {
-            "claude": bool(cls.ANTHROPIC_API_KEY),
-            "gpt4o": bool(cls.OPENAI_API_KEY),
-            "gemini": bool(cls.GOOGLE_API_KEY),
+            "claude": _is_real_key(cls.ANTHROPIC_API_KEY),
+            "gpt4o": _is_real_key(cls.OPENAI_API_KEY),
+            "gemini": _is_real_key(cls.GOOGLE_API_KEY),
         }
 
     @classmethod
@@ -77,17 +101,17 @@ class Config:
         """Return expert availability and model info for health check."""
         result = {}
 
-        if cls.ANTHROPIC_API_KEY:
+        if _is_real_key(cls.ANTHROPIC_API_KEY):
             result["claude"] = {"available": True, "model": cls.CLAUDE_MODEL}
         else:
             result["claude"] = {"available": False, "error": "API key not configured"}
 
-        if cls.OPENAI_API_KEY:
+        if _is_real_key(cls.OPENAI_API_KEY):
             result["gpt4o"] = {"available": True, "model": cls.OPENAI_MODEL}
         else:
             result["gpt4o"] = {"available": False, "error": "API key not configured"}
 
-        if cls.GOOGLE_API_KEY:
+        if _is_real_key(cls.GOOGLE_API_KEY):
             result["gemini"] = {"available": True, "model": cls.GEMINI_MODEL}
         else:
             result["gemini"] = {"available": False, "error": "API key not configured"}
