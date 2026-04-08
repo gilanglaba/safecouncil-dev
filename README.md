@@ -55,36 +55,15 @@ Open http://localhost:3000 — the frontend proxies `/api/*` to the backend on p
 
 ---
 
-## How the Evaluation Works
+## How It Works
 
-1. **Submit**: User provides agent details + conversation examples, pastes a GitHub URL, connects an API, or selects from the Tool Catalog
-2. **Queue**: Backend creates a job and returns `eval_id` immediately (202 Accepted)
-3. **Governance context**: RAG-lite lookup of selected frameworks (EU AI Act, NIST, OWASP, UNESCO, ISO 42001, UNICC)
-4. **Independent evaluation** *(parallel)*: Each expert evaluates the agent across **10 safety dimensions** in 5 categories
-5. **Cross-critique** *(deliberative only, parallel)*: Each expert reviews others' assessments, challenging score differences and surfacing missed risks
-6. **Score revision** *(deliberative only, parallel)*: Experts revise scores based on critiques, producing traceable `score_changes` with justifications
-7. **Final position statements** *(deliberative only, parallel)*: Each expert issues a final 2–4 sentence position after the critique round
-8. **Synthesis** *(deliberative only)*: One expert generates a debate transcript narrating the actual deliberation, plus agreements, disagreements, mitigations, and an **executive summary** for non-technical readers
-9. **Output specificity enforcement**: Deterministic post-processor scans every finding, dimension detail, and debate message. Any piece that doesn't reference the agent by name is patched in place using architecture notes / filenames pulled from `eval_input.environment`. Guarantees the final report is grounded in the actual agent regardless of LLM behavior. Enforcement stats surface in `audit.specificity`.
-10. **Verdict**: APPROVE / REVIEW / REJECT with prioritized mitigations
-11. **Audit log**: Complete JSON record saved to `backend/logs/{eval_id}.json` (gitignored)
+Submit an agent through one of four input methods → 3 LLM experts evaluate it in parallel → cross-critique, score revision, and synthesis (deliberative method) or statistical aggregation (aggregate method) → APPROVE / REVIEW / REJECT verdict with prioritized mitigations and a plain-language executive summary.
 
----
-
-## Input Methods
-
-SafeCouncil accepts AI agents through four input modes — pick whichever matches what you have:
-
-| Mode | What you provide | Best for |
-|---|---|---|
-| **1. Tool Catalog** | Click a pre-loaded agent (WFP Support Bot, VeriMedia, UNICEF/UNHCR/WHO simulations) | Demo users who want to see the full pipeline immediately |
-| **2. GitHub Repo URL** | Paste any public GitHub URL — SafeCouncil fetches the README + code, extracts an agent profile via Claude, and generates interface-appropriate test probes | Open-source AI agents, dynamic evaluation |
-| **3. Connect API** | A live HTTPS endpoint + auth header — SafeCouncil sends real probes to your running agent | Agents already deployed in staging/production |
-| **4. Upload Files** | A JSON or CSV of conversation pairs (`prompt` / `output`) | Offline transcript analysis, batch evaluations |
-
-**Try VeriMedia**: from the Tool Catalog, click **VeriMedia** — it routes to [github.com/FlashCarrot/VeriMedia](https://github.com/FlashCarrot/VeriMedia) and runs a full deliberative evaluation against the live repo. VeriMedia is a Flask-based AI media ethics analyzer with a GPT-4o backend; SafeCouncil's report specifically calls out its file upload surface and missing authentication layer as deployment-blocking findings.
-
-**Try GitHub URL ingestion**: under **GitHub Repo**, paste any public AI-agent repo URL — for example, try VeriMedia at [https://github.com/FlashCarrot/VeriMedia](https://github.com/FlashCarrot/VeriMedia). SafeCouncil ingests the README + code, infers the agent's interface (chat / API / file processor), generates appropriate test probes, and runs them against a Claude-simulated version of the agent — no live deployment required.
+**Input methods:**
+- **Tool Catalog** — pre-loaded agents (WFP, UNICEF, UNHCR, WHO, VeriMedia)
+- **GitHub URL** — paste any public repo, e.g. [github.com/FlashCarrot/VeriMedia](https://github.com/FlashCarrot/VeriMedia). SafeCouncil fetches README + code, extracts an agent profile, generates interface-appropriate probes, and simulates the agent
+- **Connect API** — point at a live HTTPS endpoint
+- **Upload Files** — JSON / CSV of conversation pairs
 
 ---
 
@@ -160,18 +139,17 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/evaluate` | Submit new evaluation |
-| `POST` | `/api/evaluate/demo` | Submit demo evaluation (WFP chatbot) |
-| `GET` | `/api/evaluate/{id}/status` | Poll evaluation progress |
-| `GET` | `/api/evaluate/{id}` | Get full results |
-| `GET` | `/api/evaluate/{id}/pdf` | Download PDF report |
-| `GET` | `/api/evaluations` | List all past evaluations |
-| `GET` | `/api/frameworks` | List governance frameworks |
-| `GET` | `/api/health` | Health check + provider availability (`claude`, `gpt4o`, `gemini`, `local`) + `demo_mode` flag |
-| `POST` | `/api/governance/upload` | Upload governance document, extract dimensions YAML |
-| `POST` | `/api/governance/confirm` | Save reviewed custom dimensions YAML to `backend/dimensions/custom/` |
+| `POST` | `/api/evaluate` | Submit new evaluation (sync 202 + `eval_id`) |
+| `GET`  | `/api/evaluate/{id}/status` | Poll progress |
+| `GET`  | `/api/evaluate/{id}` | Full results |
+| `GET`  | `/api/evaluate/{id}/pdf` | Download PDF report |
+| `GET`  | `/api/evaluations` | List past evaluations |
+| `GET`  | `/api/health` | Provider availability + `demo_mode` flag |
+| `GET`  | `/api/frameworks` | List governance frameworks |
+| `POST` | `/api/governance/upload` | Upload governance doc → extract dimensions YAML |
+| `POST` | `/api/governance/confirm` | Save reviewed custom dimensions YAML |
 
-Request and response shapes are defined as Python dataclasses in `backend/models/schemas.py` (`EvaluationInput` for the request body, `CouncilResult` for the response). The frontend uses these via `frontend/src/api.js`.
+Request and response shapes live in `backend/models/schemas.py` (`EvaluationInput`, `CouncilResult`).
 
 ---
 
@@ -273,80 +251,24 @@ safecouncil/
 
 ---
 
-## Demo Mode (run without API keys)
+## Demo Mode
 
-SafeCouncil's demo mode runs **the real `SimpleOrchestrator` pipeline end-to-end** without any LLM API keys. It is not a deepcopy of a pre-built JSON template — every step that would normally call an LLM (evaluate, critique, revise, position statement, synthesize) executes against an `OfflineProvider` that returns deterministic, expert-seeded JSON responses. The orchestrator's parallel `ThreadPoolExecutor` runs, the critique round produces real disagreements, the revision round emits real `score_changes`, and the synthesis step produces a real `debate_transcript` — all computed by orchestrator code paths, not hard-coded.
+When all three cloud API keys are missing (or still set to `.env.example` placeholders), SafeCouncil auto-engages demo mode and runs the **real** `SimpleOrchestrator` pipeline end-to-end via a deterministic `OfflineProvider` — no LLM calls, no template deepcopy. Critique, revision, and synthesis all execute, producing real `score_changes` and a real `debate_transcript`. Override with `DEMO_MODE=true|false|auto` in `backend/.env`. Verify the current mode at `GET /api/health`.
 
-The pre-built JSON templates under `backend/demo_fixtures/` exist only as a safety-net fallback if the offline orchestrator throws an exception.
+---
 
-**Configuration via `DEMO_MODE` environment variable in `backend/.env`:**
+## Commands
 
-| Value | Behavior |
+| Command | Purpose |
 |---|---|
-| `true` | Force demo mode regardless of API keys |
-| `false` | Force real mode — backend will fail evaluations if no real keys are configured |
-| `auto` | *(default)* Demo mode when all three cloud API keys are missing **OR still set to the `.env.example` placeholders** (`your_anthropic_api_key_here` etc.). As soon as you set even one real key, real evaluation runs |
-
-The auto detection treats placeholder values as "not set" so a first-time user who runs `make setup` and never touches `.env` lands in demo mode automatically.
-
-**Try it without any API keys:**
-
-```bash
-make setup       # creates backend/.env from .env.example (empty keys)
-make install-frontend
-make dev         # starts backend + frontend
-```
-
-Open the Evaluate page → submit any agent → the real SimpleOrchestrator runs end-to-end via the offline provider and returns a result with real arbitration artifacts. **No API keys required.** Or use the one-command path:
-
-```bash
-make demo        # runs a VeriMedia demo end-to-end and prints verdict + summary to stdout
-```
-
-**For developers switching modes:**
-
-Edit `backend/.env` to change `DEMO_MODE` or add API keys, then **restart the backend** with `make dev` for the changes to take effect. Environment variables are loaded once at startup.
-
-**Verifying which mode the backend is in:**
-
-```bash
-curl http://localhost:5000/api/health
-```
-
-The response includes a `demo_mode: true|false` field.
-
----
-
-## Running Tests
-
-Tests are organized by category using pytest markers:
-
-- **Unit tests** — no API calls, no live server required
-- **Integration tests** — require Flask server running on `localhost:5000`
-- **Live API tests** — make real LLM API calls (require API keys, costs money)
-
-```bash
-make test          # Unit tests only (default — runs out of the box)
-make test-api      # Integration tests (start backend first with `make run`)
-make test-all      # All tests including live API calls
-```
-
----
-
-## Makefile Targets
-
-| Target | Description |
-|--------|-------------|
-| `make dev` | **Default** — start backend (:5000) then poll `/api/health` until ready, then start frontend (:3000). Fails fast if backend doesn't come up within 30s. |
-| `make setup` | Create venv, install deps, copy `.env.example` (which ships with empty keys → DEMO_MODE auto-engages on first run) |
-| `make run` | Start backend server only |
-| `make install-frontend` | Install frontend dependencies |
-| `make run-frontend` | Start frontend dev server only |
-| `make test` | Run unit tests (no server, no API keys needed) |
-| `make test-api` | Run integration tests (requires live server) |
-| `make test-all` | Run all tests (requires server + API keys) |
-| `make demo` | **One-command demo path** — wipe `.env` so DEMO_MODE auto-engages, start the backend, POST a VeriMedia evaluation, poll for completion, pretty-print verdict + executive summary + `score_changes` count, then stop the backend. No API keys required. |
-| `make clean` | Remove venv and cache files |
+| `make setup` | Create venv, install backend deps, copy `.env.example` |
+| `make install-frontend` | Install frontend deps |
+| `make dev` | Start backend on :5000 (waits for `/api/health`), then frontend on :3000 |
+| `make demo` | Run a VeriMedia evaluation end-to-end in demo mode, print the result, exit. No API keys required. |
+| `make test` | Unit tests (default) |
+| `make test-api` | Integration tests (requires live server) |
+| `make test-all` | All tests including live LLM calls (requires keys) |
+| `make clean` | Remove venv and caches |
 
 ---
 
@@ -359,17 +281,16 @@ make test-all      # All tests including live API calls
 
 ## Project Contributors
 
-SafeCouncil is a 3-student capstone where each contributor owns a distinct project area. The codebase is organized so each student's work maps to a clear set of modules:
-
-| Contributor | Project Area | Owns these modules |
+| Contributor | Project Area | Owned modules |
 |---|---|---|
-| **Pengyun (Jimmy) Ma** | Platform & Infrastructure | `backend/config.py`, `backend/governance/`, `backend/dimensions/`, `backend/services/github_ingestion_service.py`, `backend/experts/llm_providers/` (provider abstractions, local LLM support, modular architecture) |
-| **Gilang Laba** | AI Orchestration & Synthesis | `backend/orchestrators/`, `backend/experts/expert.py`, `backend/experts/base_expert.py`, `backend/prompts/` (council-of-experts, deliberative pipeline, cross-critique, score revision, synthesis) |
-| **Iris Zhang** | UX & Integration | `frontend/`, `backend/services/evaluation_service.py`, `backend/app.py` (React UI, evaluate/results pages, API integration, end-to-end user flow) |
+| **Pengyun (Jimmy) Ma** | Platform & Infrastructure | `backend/config.py`, `backend/governance/`, `backend/dimensions/`, `backend/services/github_ingestion_service.py`, `backend/experts/llm_providers/` |
+| **Gilang Laba** | AI Orchestration & Synthesis | `backend/orchestrators/`, `backend/experts/expert.py`, `backend/experts/base_expert.py`, `backend/prompts/` |
+| **Iris Zhang** | UX & Integration | `frontend/`, `backend/services/evaluation_service.py`, `backend/app.py` |
 
-Shared infrastructure (`backend/models/schemas.py`, `backend/demo_data.py`, `tests/`, `Makefile`) is owned jointly. The three projects integrate through the platform's modular architecture — each layer can be developed and tested independently.
+Shared modules (`backend/models/schemas.py`, `tests/`, `Makefile`) are owned jointly.
 
 ---
+
 ## License
 
 MIT License — see LICENSE for details.
