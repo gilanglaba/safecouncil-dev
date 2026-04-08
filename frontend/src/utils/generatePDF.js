@@ -374,31 +374,45 @@ export function buildReportHTML(result) {
 
 /**
  * Generate and download a PDF report for an evaluation result.
- * Uses a hidden iframe + browser print dialog.
+ * Renders the HTML report off-screen and saves directly as a .pdf file
+ * (no browser print dialog) using html2pdf.js (html2canvas + jsPDF).
  */
-export function downloadPDF(result) {
+export async function downloadPDF(result) {
   const html = buildReportHTML(result);
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
 
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "none";
-  document.body.appendChild(iframe);
+  // Off-screen container to render the report
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-10000px";
+  container.style.top = "0";
+  container.style.width = "794px"; // ~A4 width @ 96dpi
+  container.style.background = "#fff";
 
-  iframe.src = url;
-  iframe.onload = () => {
-    setTimeout(() => {
-      iframe.contentWindow.print();
-      // Clean up after printing
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-        URL.revokeObjectURL(url);
-      }, 1000);
-    }, 500);
-  };
+  // Extract <body> contents from the built HTML so styles + markup render in-page
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  container.innerHTML =
+    (styleMatch ? `<style>${styleMatch[1]}</style>` : "") +
+    (bodyMatch ? bodyMatch[1] : html);
+  document.body.appendChild(container);
+
+  const safeName = (result.agent_name || "evaluation").replace(/[^a-z0-9-_]+/gi, "_");
+  const filename = `SafeCouncil-Report-${safeName}.pdf`;
+
+  try {
+    const html2pdf = (await import("html2pdf.js")).default;
+    await html2pdf()
+      .set({
+        margin: [10, 10, 10, 10],
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["css", "legacy"] },
+      })
+      .from(container)
+      .save();
+  } finally {
+    document.body.removeChild(container);
+  }
 }
