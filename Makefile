@@ -5,11 +5,27 @@ PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 
 # Default target — run both backend and frontend
+# Polls /api/health until the backend is actually listening before starting
+# the frontend, so the dev loop does not race on slow machines.
 dev: $(VENV)
 	@$(PYTHON) -c "import dotenv" 2>/dev/null || $(PIP) install -r backend/requirements.txt
 	@echo "Starting SafeCouncil (backend :5000 + frontend :3000)..."
 	@cd backend && ../$(PYTHON) app.py &
-	@sleep 2
+	@printf "Waiting for backend to become ready"; \
+	for i in $$(seq 1 30); do \
+		if curl -fsS http://localhost:5000/api/health >/dev/null 2>&1; then \
+			printf " ready (%ds)\n" "$$i"; \
+			break; \
+		fi; \
+		if [ "$$i" -eq 30 ]; then \
+			printf "\nERROR: backend did not come up on :5000 within 30s. Check backend logs.\n" >&2; \
+			pkill -f "python app.py" 2>/dev/null || true; \
+			pkill -f "python3 app.py" 2>/dev/null || true; \
+			exit 1; \
+		fi; \
+		printf "."; \
+		sleep 1; \
+	done
 	@cd frontend && npm run dev
 
 run: $(VENV)
