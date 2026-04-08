@@ -290,7 +290,7 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
       frameworks: frameworks.filter((f) => f.checked).map((f) => f.id),
       experts: experts.map(({ llm, enabled }) => ({ llm, enabled })),
       orchestration_method: orchestrationMethod,
-      synthesis_provider: orchestrationMethod === "deliberative" ? synthesisProvider : null,
+      synthesis_provider: synthesisProvider,
     };
     if (inputMethod === "catalog") {
       onSubmit({ ...base, conversations: [], input_method: "api_probe", api_config: { tool_id: selectedTool } });
@@ -853,13 +853,21 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
           ))}
         </div>
 
-        {/* Synthesis provider toggle — only meaningful for Deliberative */}
-        {orchestrationMethod === "deliberative" && (
-          <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${theme.borderSubtle}` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>Synthesis runs on:</span>
-              <Tooltip text="Synthesis is the final step that generates the consolidated debate transcript and verdict report. You can run it on a cloud LLM (Claude) or on your own on-premise LLM, even if cross-critique runs on cloud APIs." />
-            </div>
+        {/* Synthesis provider toggle — applies to both methods.
+            Deliberative: the multi-round debate's final synthesis step.
+            Aggregate: the single narrative synthesis call that runs after
+            statistical aggregation to cluster mitigations and write the
+            executive summary / council briefing. */}
+        <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${theme.borderSubtle}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>Synthesis runs on:</span>
+            <Tooltip text="Synthesis generates the consolidated executive summary, council briefing, agreements/disagreements, and mitigations. In Deliberative it runs as the final step of the debate; in Aggregate it runs once after statistical aggregation. You can run it on a cloud LLM (Claude) or on your own on-premise LLM, even if the experts run on cloud APIs." />
+          </div>
+          <div style={{ fontSize: 11, color: theme.textTer, marginBottom: 8 }}>
+            {orchestrationMethod === "aggregate"
+              ? "One narrative synthesis call after statistical aggregation. Statistical verdict, confidence, and scores remain pure math."
+              : "Final step of the council debate — generates the verdict report and transcript."}
+          </div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {[
                 { id: "claude", label: "Cloud (Claude)", disabled: false, hint: "Default — best report quality" },
@@ -894,13 +902,12 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
                 </label>
               ))}
             </div>
-            {synthesisProvider === "local" && (
-              <div style={{ marginTop: 10, padding: "8px 12px", background: theme.amberPale || "#FFF8E1", borderRadius: 8, fontSize: 12, color: theme.textSec, border: `1px solid ${theme.amberBorder || "#F5D28A"}` }}>
-                ⚠ Local synthesis works best with 70B+ models. Smaller models may produce truncated reports — SafeCouncil will fall back to a deterministic summary if JSON parsing fails.
-              </div>
-            )}
-          </div>
-        )}
+          {synthesisProvider === "local" && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: theme.amberPale || "#FFF8E1", borderRadius: 8, fontSize: 12, color: theme.textSec, border: `1px solid ${theme.amberBorder || "#F5D28A"}` }}>
+              ⚠ Local synthesis works best with 70B+ models. Smaller models may produce truncated reports — SafeCouncil will fall back to a deterministic summary if JSON parsing fails.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Submission ─────────────────────────────────────────────────────── */}
