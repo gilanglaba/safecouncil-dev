@@ -365,6 +365,17 @@ class SimpleOrchestrator(BaseOrchestrator):
             self.agent_name, assessments, debate_transcript
         )
 
+        # Executive summary — plain-English 3-5 sentence summary for
+        # non-technical readers. Prefer one provided by the synthesizer
+        # (real LLM or offline provider); otherwise derive one.
+        executive_summary = synthesis_data.get("executive_summary") or self._derive_executive_summary(
+            agent_name=self.agent_name,
+            verdict=final_verdict,
+            confidence=int(synthesis_data.get("confidence", 70)),
+            mitigations=mitigations,
+            assessments=assessments,
+        )
+
         return CouncilResult(
             expert_assessments=assessments,
             debate_transcript=debate_transcript,
@@ -384,7 +395,60 @@ class SimpleOrchestrator(BaseOrchestrator):
             conversations=eval_input.conversations,
             synthesis_fallback=getattr(self, "_synthesis_fallback", False),
             synthesizer_name=getattr(self, "_synthesizer_name", None),
+            executive_summary=executive_summary,
         )
+
+    def _derive_executive_summary(self, agent_name, verdict, confidence, mitigations, assessments) -> str:
+        """
+        Generate a 3-5 sentence plain-English summary when the synthesizer
+        didn't provide one (e.g., live LLM that missed the field). Avoids
+        jargon and numeric scores; names the verdict, the top risks, and
+        the recommended next action.
+        """
+        try:
+            verdict_label = verdict.value if hasattr(verdict, "value") else str(verdict)
+        except Exception:
+            verdict_label = "REVIEW"
+
+        verdict_text = {
+            "APPROVE": "is safe to deploy",
+            "REVIEW": "needs changes before it can be deployed safely",
+            "REJECT": "is not ready for deployment",
+        }.get(verdict_label, "needs changes before it can be deployed safely")
+
+        # Top 2-3 high-severity findings across all experts
+        top_concerns = []
+        for a in assessments:
+            for f in getattr(a, "findings", []) or []:
+                sev = getattr(f.severity, "value", str(f.severity)) if hasattr(f, "severity") else "MEDIUM"
+                if sev in ("CRITICAL", "HIGH") and f.dimension:
+                    if f.dimension not in top_concerns:
+                        top_concerns.append(f.dimension)
+                if len(top_concerns) >= 3:
+                    break
+            if len(top_concerns) >= 3:
+                break
+        concerns_text = (
+            ", ".join(top_concerns[:-1]) + " and " + top_concerns[-1]
+            if len(top_concerns) >= 2
+            else (top_concerns[0] if top_concerns else "a few areas identified by the council")
+        )
+
+        # Top mitigation (priority order)
+        next_action = ""
+        if mitigations:
+            top_m = sorted(mitigations, key=lambda m: {"P0": 0, "P1": 1, "P2": 2, "P3": 3}.get(
+                m.priority if isinstance(m.priority, str) else getattr(m.priority, "value", "P2"), 4))[0]
+            next_action = top_m.text if hasattr(top_m, "text") else str(top_m)
+
+        sentences = [
+            f"The SafeCouncil reviewed {agent_name} and concluded that it {verdict_text}.",
+            f"The experts reached their verdict with about {confidence}% confidence after comparing findings across the panel.",
+            f"The most important concerns are: {concerns_text}.",
+        ]
+        if next_action:
+            sentences.append(f"Recommended next step: {next_action}")
+        return " ".join(sentences)
 
     # ── Output Quality: Structured, Readable, Agent-Specific ────────────────
     # SafeCouncil ensures that evaluation output is structured, readable, and

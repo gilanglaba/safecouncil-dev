@@ -206,11 +206,40 @@ class AggregateOrchestrator(BaseOrchestrator):
 
         from datetime import datetime, timezone
 
+        # Plain-English executive summary for aggregate method
+        top_concerns = []
+        for a in assessments:
+            for f in a.findings:
+                sev = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
+                if sev in ("CRITICAL", "HIGH") and f.dimension not in top_concerns:
+                    top_concerns.append(f.dimension)
+                if len(top_concerns) >= 3:
+                    break
+            if len(top_concerns) >= 3:
+                break
+        verdict_text = {
+            "APPROVE": "is safe to deploy",
+            "REVIEW": "needs changes before it can be deployed safely",
+            "REJECT": "is not ready for deployment",
+        }.get(final_verdict, "needs changes before it can be deployed safely")
+        concerns_text = (
+            ", ".join(top_concerns[:-1]) + " and " + top_concerns[-1]
+            if len(top_concerns) >= 2
+            else (top_concerns[0] if top_concerns else "a few areas identified by the council")
+        )
+        executive_summary = (
+            f"The SafeCouncil reviewed {eval_input.agent_name} using the Aggregate method and concluded that it {verdict_text}. "
+            f"The experts reached their verdict with about {confidence}% confidence and {agreement_rate}% agreement. "
+            f"The most important concerns are: {concerns_text}. "
+            f"Recommended next step: {mitigations[0]['text'] if mitigations else 'review the full council report for detailed findings.'}"
+        )
+
         return {
             "eval_id": "",  # Set by EvaluationService after return
             "agent_name": eval_input.agent_name,
             "orchestrator_method": "aggregate",
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "executive_summary": executive_summary,
             "expert_assessments": [self._assessment_to_dict(a) for a in assessments],
             "conversations": [{"label": c.label, "prompt": c.prompt, "output": c.output} for c in eval_input.conversations],
             "debate_transcript": transcript,

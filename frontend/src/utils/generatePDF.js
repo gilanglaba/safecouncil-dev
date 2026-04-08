@@ -305,6 +305,14 @@ export function buildReportHTML(result) {
     </div>
   </div>
 
+  ${result.executive_summary ? `
+  <!-- Executive Summary — plain-English for non-technical readers -->
+  <div style="background:#ffffff; border:1px solid #E5E0EC; border-left:4px solid #57068C; border-radius:8px; padding:18px 22px; margin-bottom:16px;">
+    <div style="font-size:10px; font-weight:700; letter-spacing:0.08em; color:#57068C; text-transform:uppercase; margin-bottom:8px;">Executive Summary</div>
+    <div style="font-size:14px; line-height:1.55; color:#1A0A2E; font-weight:400;">${escapeHtml(result.executive_summary)}</div>
+  </div>
+  ` : ""}
+
   <!-- Verdict Banner -->
   <div class="verdict-banner" style="background:${vs.bg}; border: 1px solid ${vs.border}">
     <div>

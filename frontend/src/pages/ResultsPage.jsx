@@ -1151,6 +1151,32 @@ function ResultsView({ result, onDownloadPDF }) {
 
   return (
     <div>
+      {/* Executive summary — plain-English, for non-technical readers */}
+      {result.executive_summary && (
+        <div
+          style={{
+            background: "#FFFFFF",
+            border: `1px solid ${theme.border}`,
+            borderLeft: `4px solid ${theme.violet}`,
+            borderRadius: theme.radiusMd,
+            padding: "20px 24px",
+            marginBottom: 16,
+          }}
+        >
+          <div style={{
+            fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+            color: theme.violet, textTransform: "uppercase", marginBottom: 8,
+          }}>
+            Executive Summary
+          </div>
+          <div style={{
+            fontSize: 17, lineHeight: 1.55, color: theme.text, fontWeight: 400,
+          }}>
+            {result.executive_summary}
+          </div>
+        </div>
+      )}
+
       {/* Verdict banner */}
       <div
         style={{

@@ -345,6 +345,7 @@ class CouncilResult:
     conversations: List[Conversation] = field(default_factory=list)
     synthesis_fallback: bool = False  # True if synthesis JSON parse failed and deterministic summary was used
     synthesizer_name: Optional[str] = None  # Which expert/provider ran synthesis
+    executive_summary: Optional[str] = None  # Plain-English 3-5 sentence summary for non-technical readers
 
     def to_dict(self) -> dict:
         d = {
@@ -352,6 +353,7 @@ class CouncilResult:
             "agent_name": self.agent_name,
             "orchestrator_method": self.orchestrator_method,
             "timestamp": self.timestamp,
+            "executive_summary": self.executive_summary,
             "verdict": {
                 "final_verdict": self.final_verdict.value,
                 "confidence": self.confidence,
