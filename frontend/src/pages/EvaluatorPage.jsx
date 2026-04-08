@@ -802,8 +802,11 @@ function InputPhase({ onSubmit, onDemoLoad, submitting, submitError }) {
 
       {/* ── SECTION 4: Orchestration Method ────────────────────────────────── */}
       <div style={{ background: theme.surface, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 28, marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <SectionHead num="4" title="Council Method" />
+        <SectionHead num="4" title="Council Method" />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 14px" }}>
+          <p style={{ fontSize: 13, color: theme.textSec, margin: 0, lineHeight: 1.5 }}>
+            Choose how the council reaches its verdict — through structured debate or independent scoring.
+          </p>
           <Tooltip text={'"Deliberative" is recommended — experts debate and revise their scores. "Aggregate" is faster but skips the cross-critique step.'} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
