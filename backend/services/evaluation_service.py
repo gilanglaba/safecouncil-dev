@@ -254,7 +254,10 @@ class EvaluationService:
                             eval_input.agent_name = profile["agent_name"]
                             eval_input.use_case = profile["use_case"]
                             eval_input.system_prompt = profile["system_prompt"]
-                            eval_input.environment = profile.get("environment", eval_input.environment)
+                            eval_input.environment = self._merge_architecture_notes(
+                                profile.get("environment", eval_input.environment),
+                                profile.get("architecture_notes"),
+                            )
                             eval_input.data_sensitivity = profile.get("data_sensitivity", eval_input.data_sensitivity)
                             is_probe = False
                             step_offset = 0
@@ -295,7 +298,10 @@ class EvaluationService:
                         eval_input.agent_name = profile["agent_name"]
                         eval_input.use_case = profile["use_case"]
                         eval_input.system_prompt = profile["system_prompt"]
-                        eval_input.environment = profile.get("environment", eval_input.environment)
+                        eval_input.environment = self._merge_architecture_notes(
+                            profile.get("environment", eval_input.environment),
+                            profile.get("architecture_notes"),
+                        )
                         eval_input.data_sensitivity = profile.get("data_sensitivity", eval_input.data_sensitivity)
                         is_probe = False
                         step_offset = 0
@@ -537,6 +543,22 @@ class EvaluationService:
                 logger.warning(f"Skipping {llm} expert: {e}")
 
         return experts
+
+    @staticmethod
+    def _merge_architecture_notes(environment: str, notes) -> str:
+        """
+        Append extracted architecture_notes as a bulleted block to the
+        environment string so every expert sees architectural ground truth
+        (framework, LLM backend, attack surfaces, missing security controls)
+        when the rubric prompt interpolates `eval_input.environment`.
+        """
+        env = environment or ""
+        if not notes:
+            return env
+        bullets = "\n".join(f"- {n}" for n in notes if isinstance(n, str) and n.strip())
+        if not bullets:
+            return env
+        return f"{env}\n\nArchitecture notes (extracted from source code):\n{bullets}"
 
     def _select_synthesizer(self, eval_input: EvaluationInput, experts: list):
         """
