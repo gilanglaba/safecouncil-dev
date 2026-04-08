@@ -211,55 +211,9 @@ function ExpertCard({ assessment }) {
   );
 }
 
-function OverviewTab({ result }) {
-  const assessments = result.expert_assessments || [];
-  const verdict = result.verdict || {};
-  const avgScore = assessments.length
-    ? Math.round(assessments.reduce((s, a) => s + a.overall_score, 0) / assessments.length)
-    : 0;
-  const allFindings = assessments.flatMap((a) => a.findings || []);
-  const criticalCount = allFindings.filter((f) => {
-    const sev = typeof f.severity === "string" ? f.severity : f.severity?.value;
-    return sev === "CRITICAL" || sev === "HIGH";
-  }).length;
-  const topRisk = allFindings.length > 0
-    ? [...allFindings].sort((a, b) => (SEVERITY_ORDER[(typeof a.severity === "string" ? a.severity : a.severity?.value)] ?? 4) - (SEVERITY_ORDER[(typeof b.severity === "string" ? b.severity : b.severity?.value)] ?? 4))[0]
-    : null;
-  const p0Count = (result.mitigations || []).filter((m) => m.priority === "P0").length;
-
-  const vc = {
-    APPROVE: theme.green, REVIEW: theme.amber, REJECT: theme.red,
-  }[verdict.final_verdict] || theme.amber;
-
+function ExpertPanelTab({ result }) {
   return (
     <div>
-      {/* Executive Summary */}
-      <div style={{
-        background: theme.surface,
-        border: `1px solid ${theme.border}`,
-        borderRadius: theme.radiusMd,
-        padding: "18px 24px",
-        marginBottom: 24,
-        lineHeight: 1.6,
-        fontSize: 14,
-        color: theme.text,
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-          Executive Summary
-        </div>
-        <p style={{ margin: 0 }}>
-          <strong>{result.agent_name}</strong> received a <strong style={{ color: vc }}>{verdict.final_verdict}</strong> deployment
-          verdict from a panel of {assessments.length} independent AI experts using the <strong>{(result.orchestrator_method || "deliberative") === "deliberative" ? "Deliberative" : "Aggregate"}</strong> method.
-          The average safety score is <strong style={{ color: getScoreColor(avgScore) }}>{avgScore}/100 ({scoreLabel(avgScore)})</strong>.
-          {criticalCount > 0
-            ? ` The council identified ${criticalCount} critical/high-severity finding${criticalCount !== 1 ? "s" : ""} requiring remediation before deployment.`
-            : " No critical or high-severity findings were identified."
-          }
-          {topRisk ? ` The highest-priority risk is ${topRisk.dimension.toLowerCase()}.` : ""}
-          {p0Count > 0 ? ` There ${p0Count === 1 ? "is" : "are"} ${p0Count} deployment-blocking action item${p0Count !== 1 ? "s" : ""} that must be resolved.` : ""}
-        </p>
-      </div>
-
       {/* Expert cards */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
         {(result.expert_assessments || []).map((a) => (
@@ -1122,19 +1076,14 @@ function EvidenceLogTab({ result }) {
 // Results View
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Reader Mode (Stakeholder View) ────────────────────────────────────────
-// Collapses the dense 7-tab technical report into a single scrollable page
-// with just what a non-technical UNICC stakeholder needs: executive summary,
-// verdict, top plain-language risks, top plain-language mitigations.
-// Toggled from the top of the ResultsView; default ON for new results.
-function StakeholderView({ result }) {
-  const verdict = result.verdict || {};
-  const vc = {
-    APPROVE: { bg: theme.greenPale, text: theme.green, border: theme.greenBorder },
-    REVIEW: { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder },
-    REJECT: { bg: theme.redPale, text: theme.red, border: theme.redBorder },
-  }[verdict.final_verdict] || { bg: theme.amberPale, text: theme.amber, border: theme.amberBorder };
-
+// ── Overview Tab ──────────────────────────────────────────────────────────
+// Default landing tab — plain-language overview of the council's findings
+// for non-technical UNICC stakeholders. Shows the top 3 risks and top 3
+// recommended next steps using plain_summary fields. The verdict banner
+// and executive summary already render above every tab, so this tab
+// focuses entirely on what stakeholders need to act on. For per-expert
+// detail, scores, and rationales, see the Expert Panel tab.
+function OverviewTab({ result }) {
   // Pick top plain-language items across all experts (dedupe by dimension)
   const allFindings = (result.expert_assessments || []).flatMap((a) => a.findings || []);
   const sevRank = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
@@ -1155,99 +1104,120 @@ function StakeholderView({ result }) {
   const mitigations = result.mitigations || [];
   const topMits = mitigations.slice(0, 3);
 
+  // Severity color helper — matches theme palette
+  const sevColor = (sev) => {
+    const s = typeof sev === "string" ? sev : sev?.value;
+    if (s === "CRITICAL" || s === "HIGH") return { bg: theme.redPale, fg: theme.red };
+    if (s === "MEDIUM") return { bg: theme.amberPale, fg: theme.amber };
+    return { bg: theme.violetPale, fg: theme.violet };
+  };
+
   return (
     <div>
-      {/* Big verdict ribbon */}
-      <div
-        style={{
-          background: vc.bg,
-          border: `1px solid ${vc.border}`,
+      {/* Intro line */}
+      <p style={{
+        fontSize: 13, color: theme.textSec, margin: "0 0 20px", lineHeight: 1.5,
+      }}>
+        A plain-language overview of the council's findings. Open <strong>Expert Panel</strong> to see what each expert contributed, or explore the other tabs for per-dimension scores, evidence logs, and the full deliberation transcript.
+      </p>
+
+      {/* Top risks — matches OverviewTab card aesthetic */}
+      {topFindings.length > 0 && (
+        <div style={{
+          background: theme.surface,
+          border: `1px solid ${theme.border}`,
           borderRadius: theme.radiusMd,
           padding: "18px 24px",
           marginBottom: 20,
-          display: "flex",
-          alignItems: "center",
-          gap: 18,
-        }}
-      >
-        <VerdictBadge verdict={verdict.final_verdict} size="lg" />
-        <div style={{ color: vc.text, fontSize: 14, lineHeight: 1.5 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
-            Council Recommendation
-          </div>
-          <div>
-            Confidence <strong>{verdict.confidence ?? "—"}%</strong> · Agreement <strong>{verdict.agreement_rate ?? "—"}%</strong>
-            {verdict.final_verdict && " · "}
-            {verdict.final_verdict && (VERDICT_EXPLANATIONS[verdict.final_verdict] || "")}
-          </div>
-        </div>
-      </div>
-
-      {/* Top risks in plain language */}
-      {topFindings.length > 0 && (
-        <div style={{
-          background: "#FFFFFF",
-          border: `1px solid ${theme.border}`,
-          borderRadius: theme.radiusMd,
-          padding: "20px 24px",
-          marginBottom: 20,
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-            Top Risks (plain language)
+          <div style={{
+            fontSize: 12, fontWeight: 700, color: theme.textTer,
+            textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14,
+          }}>
+            Top Risks
           </div>
-          <ol style={{ margin: 0, paddingLeft: 22, lineHeight: 1.7 }}>
-            {topFindings.map((f, i) => (
-              <li key={i} style={{ marginBottom: 12, fontSize: 15, color: theme.text }}>
-                <span style={{ fontWeight: 600 }}>{f.dimension}</span>
-                <span style={{ marginLeft: 8, fontSize: 10, padding: "2px 6px", borderRadius: 4, background: theme.amberPale, color: theme.amber, fontWeight: 700 }}>
-                  {typeof f.severity === "string" ? f.severity : f.severity?.value}
-                </span>
-                <div style={{ marginTop: 4, color: theme.textSec, fontSize: 14 }}>
-                  {f.plain_summary || f.text}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {topFindings.map((f, i) => {
+              const sev = typeof f.severity === "string" ? f.severity : f.severity?.value;
+              const sc = sevColor(f.severity);
+              return (
+                <div key={i} style={{
+                  display: "flex", alignItems: "flex-start", gap: 12,
+                  paddingBottom: i < topFindings.length - 1 ? 14 : 0,
+                  borderBottom: i < topFindings.length - 1 ? `1px solid ${theme.borderSubtle}` : "none",
+                }}>
+                  <div style={{
+                    minWidth: 24, height: 24, borderRadius: 12,
+                    background: theme.violetPale, color: theme.violet,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 2,
+                  }}>
+                    {i + 1}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{f.dimension}</span>
+                      <span style={{
+                        fontSize: 10, padding: "2px 7px", borderRadius: 4,
+                        background: sc.bg, color: sc.fg, fontWeight: 700, letterSpacing: "0.04em",
+                      }}>
+                        {sev}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 14, color: theme.textSec, lineHeight: 1.55 }}>
+                      {f.plain_summary || f.text}
+                    </div>
+                  </div>
                 </div>
-              </li>
-            ))}
-          </ol>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Top mitigations in plain language */}
+      {/* Top mitigations — matches OverviewTab card aesthetic */}
       {topMits.length > 0 && (
         <div style={{
-          background: "#FFFFFF",
+          background: theme.surface,
           border: `1px solid ${theme.border}`,
-          borderLeft: `4px solid ${theme.unBlue}`,
           borderRadius: theme.radiusMd,
-          padding: "20px 24px",
+          padding: "18px 24px",
           marginBottom: 20,
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: theme.unBlueDark, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+          <div style={{
+            fontSize: 12, fontWeight: 700, color: theme.textTer,
+            textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14,
+          }}>
             Recommended Next Steps
           </div>
-          <ol style={{ margin: 0, paddingLeft: 22, lineHeight: 1.7 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {topMits.map((m, i) => (
-              <li key={i} style={{ marginBottom: 10, fontSize: 15, color: theme.text }}>
-                <span style={{ marginRight: 8, fontSize: 11, padding: "2px 7px", borderRadius: 4, background: theme.violetPale, color: theme.violet, fontWeight: 700 }}>
+              <div key={i} style={{
+                display: "flex", alignItems: "flex-start", gap: 12,
+                paddingBottom: i < topMits.length - 1 ? 14 : 0,
+                borderBottom: i < topMits.length - 1 ? `1px solid ${theme.borderSubtle}` : "none",
+              }}>
+                <div style={{
+                  minWidth: 36, padding: "3px 8px", borderRadius: 6,
+                  background: theme.violet, color: "#FFFFFF",
+                  fontSize: 11, fontWeight: 700, textAlign: "center", flexShrink: 0, marginTop: 2,
+                }}>
                   {m.priority}
-                </span>
-                {m.plain_summary || m.text}
-              </li>
+                </div>
+                <div style={{ flex: 1, fontSize: 14, color: theme.text, lineHeight: 1.55 }}>
+                  {m.plain_summary || m.text}
+                </div>
+              </div>
             ))}
-          </ol>
+          </div>
         </div>
       )}
-
-      {/* Footer hint */}
-      <div style={{ fontSize: 12, color: theme.textTer, textAlign: "center", marginTop: 8 }}>
-        This is the Reader view. Toggle off "Reader mode" at the top of the page to see the full technical report, including per-expert scores, evidence logs, and the debate transcript.
-      </div>
     </div>
   );
 }
 
 function ResultsView({ result, onDownloadPDF }) {
   const [activeTab, setActiveTab] = useState("overview");
-  const [readerMode, setReaderMode] = useState(true);
   const verdict = result.verdict || {};
   const verdictColors = {
     APPROVE: { bg: theme.greenPale, text: theme.green, border: theme.greenBorder },
@@ -1260,6 +1230,7 @@ function ResultsView({ result, onDownloadPDF }) {
 
   const TABS = [
     { id: "overview", label: "Overview" },
+    { id: "expert_panel", label: "Expert Panel" },
     { id: "scores", label: "Score Comparison" },
     { id: "compliance", label: "Compliance" },
     { id: "evidence", label: "Evidence Log" },
@@ -1275,78 +1246,6 @@ function ResultsView({ result, onDownloadPDF }) {
 
   return (
     <div>
-      {/* Reader mode toggle — lets non-technical readers collapse to the
-          stakeholder view, and lets technical users expand to the full report */}
-      <div style={{
-        display: "flex",
-        justifyContent: "flex-end",
-        alignItems: "center",
-        gap: 10,
-        marginBottom: 12,
-      }}>
-        <span style={{ fontSize: 11, color: theme.textTer, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
-          View:
-        </span>
-        <button
-          onClick={() => setReaderMode(true)}
-          style={{
-            padding: "6px 14px",
-            borderRadius: 6,
-            border: `1px solid ${readerMode ? theme.violet : theme.border}`,
-            background: readerMode ? theme.violet : "#FFFFFF",
-            color: readerMode ? "#FFFFFF" : theme.textSec,
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: theme.transition,
-          }}
-        >
-          Reader mode
-        </button>
-        <button
-          onClick={() => setReaderMode(false)}
-          style={{
-            padding: "6px 14px",
-            borderRadius: 6,
-            border: `1px solid ${!readerMode ? theme.violet : theme.border}`,
-            background: !readerMode ? theme.violet : "#FFFFFF",
-            color: !readerMode ? "#FFFFFF" : theme.textSec,
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: theme.transition,
-          }}
-        >
-          Full technical report
-        </button>
-      </div>
-
-      {/* Executive summary — plain-English, for non-technical readers */}
-      {result.executive_summary && (
-        <div
-          style={{
-            background: "#FFFFFF",
-            border: `1px solid ${theme.border}`,
-            borderLeft: `4px solid ${theme.violet}`,
-            borderRadius: theme.radiusMd,
-            padding: "20px 24px",
-            marginBottom: 16,
-          }}
-        >
-          <div style={{
-            fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-            color: theme.violet, textTransform: "uppercase", marginBottom: 8,
-          }}>
-            Executive Summary
-          </div>
-          <div style={{
-            fontSize: 17, lineHeight: 1.55, color: theme.text, fontWeight: 400,
-          }}>
-            {result.executive_summary}
-          </div>
-        </div>
-      )}
-
       {/* Verdict banner */}
       <div
         style={{
@@ -1424,53 +1323,72 @@ function ResultsView({ result, onDownloadPDF }) {
         </div>
       </div>
 
-      {readerMode ? (
-        <StakeholderView result={result} />
-      ) : (
-        <>
-          {/* Tabs */}
-          <div
+      {/* Executive summary — persistent, below the verdict banner,
+          styled to match the OverviewTab card aesthetic. Shown once,
+          above the tab bar, visible on every tab. */}
+      {result.executive_summary && (
+        <div style={{
+          background: theme.surface,
+          border: `1px solid ${theme.border}`,
+          borderRadius: theme.radiusMd,
+          padding: "18px 24px",
+          marginBottom: 20,
+          lineHeight: 1.6,
+          fontSize: 14,
+          color: theme.text,
+        }}>
+          <div style={{
+            fontSize: 12, fontWeight: 700, color: theme.textTer,
+            textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8,
+          }}>
+            Executive Summary
+          </div>
+          <p style={{ margin: 0 }}>{result.executive_summary}</p>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div
+        style={{
+          display: "flex",
+          gap: 2,
+          marginBottom: 24,
+          borderBottom: `2px solid ${theme.border}`,
+          overflowX: "auto",
+        }}
+      >
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
             style={{
-              display: "flex",
-              gap: 2,
-              marginBottom: 24,
-              borderBottom: `2px solid ${theme.border}`,
-              overflowX: "auto",
+              padding: "10px 18px",
+              background: "none",
+              border: "none",
+              borderBottom: `2px solid ${activeTab === tab.id ? theme.violet : "transparent"}`,
+              marginBottom: -2,
+              fontSize: 14,
+              fontWeight: activeTab === tab.id ? 700 : 500,
+              color: activeTab === tab.id ? theme.violet : theme.textSec,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              transition: theme.transition,
             }}
           >
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: "10px 18px",
-                  background: "none",
-                  border: "none",
-                  borderBottom: `2px solid ${activeTab === tab.id ? theme.violet : "transparent"}`,
-                  marginBottom: -2,
-                  fontSize: 14,
-                  fontWeight: activeTab === tab.id ? 700 : 500,
-                  color: activeTab === tab.id ? theme.violet : theme.textSec,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: theme.transition,
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-          {/* Tab content */}
-          {activeTab === "overview" && <OverviewTab result={result} />}
-          {activeTab === "scores" && <ScoreComparisonTab result={result} />}
-          {activeTab === "compliance" && <ComplianceTab result={result} />}
-          {activeTab === "evidence" && <EvidenceLogTab result={result} />}
-          {activeTab === "council" && (isDeliberative ? <DeliberationTab result={result} /> : <ExpertComparisonTab result={result} />)}
-          {activeTab === "findings" && <FindingsTab result={result} />}
-          {activeTab === "actions" && <ActionItemsTab result={result} onDownloadPDF={onDownloadPDF} />}
-        </>
-      )}
+      {/* Tab content */}
+      {activeTab === "overview" && <OverviewTab result={result} />}
+      {activeTab === "expert_panel" && <ExpertPanelTab result={result} />}
+      {activeTab === "scores" && <ScoreComparisonTab result={result} />}
+      {activeTab === "compliance" && <ComplianceTab result={result} />}
+      {activeTab === "evidence" && <EvidenceLogTab result={result} />}
+      {activeTab === "council" && (isDeliberative ? <DeliberationTab result={result} /> : <ExpertComparisonTab result={result} />)}
+      {activeTab === "findings" && <FindingsTab result={result} />}
+      {activeTab === "actions" && <ActionItemsTab result={result} onDownloadPDF={onDownloadPDF} />}
     </div>
   );
 }
