@@ -383,10 +383,17 @@ class EvaluationService:
             strategy = getattr(eval_input, "orchestration_method", None) or "deliberative"
             try:
                 orchestrator = OrchestratorFactory.create(strategy, experts)
-                # Set extra params for deliberative orchestrator
+                # Set the synthesizer. Both orchestrators honor it, but they
+                # expose it under different attribute names (historical):
+                #   - AggregateOrchestrator  → .synthesizer_expert
+                #   - SimpleOrchestrator     → .synthesizer
+                # We assign both so the Claude-preferred election in
+                # _select_synthesizer reaches whichever orchestrator is active.
                 synthesizer_expert = self._select_synthesizer(eval_input, experts)
                 if hasattr(orchestrator, "synthesizer_expert"):
                     orchestrator.synthesizer_expert = synthesizer_expert
+                if hasattr(orchestrator, "synthesizer"):
+                    orchestrator.synthesizer = synthesizer_expert
                 if hasattr(orchestrator, "eval_id"):
                     orchestrator.eval_id = eval_id
                 if hasattr(orchestrator, "agent_name"):
@@ -721,6 +728,16 @@ class EvaluationService:
         """
         provider_key = getattr(eval_input, "synthesis_provider", None)
         if not provider_key:
+            # Default preference: Claude. The synthesis step benefits from
+            # Claude's stronger long-context reasoning and JSON adherence.
+            # Fall back to the first expert if Claude isn't in the council.
+            for e in experts:
+                if getattr(e, "llm_provider", "").lower() == "claude":
+                    logger.info(f"Synthesizer: defaulting to Claude expert '{e.name}'")
+                    return e
+            logger.info(
+                f"Synthesizer: no Claude expert in council, falling back to '{experts[0].name}'"
+            )
             return experts[0]
 
         # Already in the council? Reuse it (avoids double provider instantiation).

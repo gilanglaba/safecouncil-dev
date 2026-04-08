@@ -44,7 +44,15 @@ class AggregateOrchestrator(BaseOrchestrator):
     - Final scores = mean of expert scores
     - Final verdict = majority vote
     - Disagreements detected but NOT resolved through debate
+    - A single LLM narrative synthesis call runs after the math. The
+      synthesizer defaults to the expert set via `synthesizer_expert`
+      (Claude-preferred, elected by EvaluationService), with fallback
+      to the first council expert.
     """
+
+    def __init__(self, experts, synthesizer_expert=None):
+        super().__init__(experts)
+        self.synthesizer_expert = synthesizer_expert
 
     def run_evaluation(self, eval_input: EvaluationInput, governance_context: str = "",
                        on_progress: Optional[Callable] = None) -> dict:
@@ -109,8 +117,16 @@ class AggregateOrchestrator(BaseOrchestrator):
         self._fire_progress(on_progress, step_aggregate, "running",
                             "Aggregating expert scores...", 88)
 
-        # Pick synthesizer (first successful expert) for the narrative call
-        synthesizer = self.experts[0] if self.experts else None
+        # Pick synthesizer for the narrative call.
+        # Preference order: explicitly injected synthesizer_expert (Claude-preferred,
+        # elected upstream by EvaluationService._select_synthesizer), else the first
+        # council expert.
+        synthesizer = self.synthesizer_expert or (self.experts[0] if self.experts else None)
+        if synthesizer is not None:
+            logger.info(
+                f"[AggregateOrchestrator] Synthesizer: {synthesizer.name} "
+                f"(provider={getattr(synthesizer, 'llm_provider', '?')})"
+            )
 
         result = self._aggregate(
             assessments, eval_input, start_time,
