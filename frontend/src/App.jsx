@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
 import EvaluatorPage from "./pages/EvaluatorPage";
 import ResultsPage from "./pages/ResultsPage";
+import PrintResultsPage from "./pages/PrintResultsPage";
 import AboutPage from "./pages/AboutPage";
 import DashboardPage from "./pages/DashboardPage";
 
@@ -12,6 +13,7 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/evaluate" element={<EvaluatorPage />} />
         <Route path="/results/:id" element={<ResultsPage />} />
+        <Route path="/results/:id/print" element={<PrintResultsPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
       </Routes>
