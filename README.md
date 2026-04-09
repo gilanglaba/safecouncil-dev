@@ -142,7 +142,6 @@ Dimensions are stored in `backend/dimensions/default.yaml` and loaded at runtime
 | `POST` | `/api/evaluate` | Submit new evaluation (sync 202 + `eval_id`) |
 | `GET`  | `/api/evaluate/{id}/status` | Poll progress |
 | `GET`  | `/api/evaluate/{id}` | Full results |
-| `GET`  | `/api/evaluate/{id}/pdf` | Download PDF report |
 | `GET`  | `/api/evaluations` | List past evaluations |
 | `GET`  | `/api/health` | Provider availability + `demo_mode` flag |
 | `GET`  | `/api/frameworks` | List governance frameworks |
@@ -197,14 +196,13 @@ safecouncil/
 │   ├── services/
 │   │   ├── evaluation_service.py       # Async job manager + orchestrator selection + demo-mode runner
 │   │   ├── probe_service.py            # Live API probing + agent simulation via Claude
-│   │   ├── github_ingestion_service.py # Parse GitHub URL → fetch README/code → profile extraction
-│   │   └── pdf_service.py              # Server-side PDF report generation
+│   │   └── github_ingestion_service.py # Parse GitHub URL → fetch README/code → profile extraction
 │   └── logs/                           # Evaluation audit logs (backend/logs/*.json is gitignored)
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/                      # LandingPage, EvaluatorPage, ResultsPage (8 tabs), DashboardPage, AboutPage
-│   │   ├── components/                 # Nav, Footer, VerdictBadge, SeverityBadge, Badge, SectionHead, CompanyIcon
-│   │   ├── utils/generatePDF.js        # Client-side PDF export template
+│   │   ├── components/                 # Nav, Footer, VerdictBadge, SeverityBadge, Badge, SectionHead, CompanyIcon, ScoreBar, PrintableReport
+│   │   ├── utils/generatePDF.js        # Triggers browser print-to-PDF (PrintableReport + @media print)
 │   │   ├── theme.js                    # Design tokens (NYU Violet + UN Blue)
 │   │   ├── api.js                      # API client
 │   │   └── demoResult.js               # Frontend-side demo data for /results/demo routes
