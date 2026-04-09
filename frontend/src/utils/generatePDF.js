@@ -374,21 +374,38 @@ export function buildReportHTML(result) {
 
 /**
  * Generate and download a PDF report for an evaluation result.
- * Renders the HTML report off-screen and saves directly as a .pdf file
- * (no browser print dialog) using html2pdf.js (html2canvas + jsPDF).
+ * Renders the HTML report into a visually hidden (but on-DOM, non-zero-size)
+ * container and saves directly as a .pdf file via html2pdf.js
+ * (html2canvas + jsPDF). No browser print dialog.
+ *
+ * Why not position:fixed;left:-10000px? html2canvas frequently captures
+ * a zero-size canvas when the source element is parked far off-screen
+ * with fixed positioning, producing a blank PDF. Instead we render the
+ * element on-screen at (0,0) with opacity:0 and pointer-events:none so
+ * the user never sees it but html2canvas gets a real layout.
  */
 export async function downloadPDF(result) {
   const html = buildReportHTML(result);
 
-  // Off-screen container to render the report
   const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
-  container.style.width = "794px"; // ~A4 width @ 96dpi
-  container.style.background = "#fff";
+  container.setAttribute("data-pdf-render", "true");
+  // Visually hidden but laid out by the browser (non-zero box, real fonts,
+  // real metrics) so html2canvas can capture actual content.
+  Object.assign(container.style, {
+    position: "absolute",
+    top: "0",
+    left: "0",
+    width: "794px", // ~A4 width @ 96dpi
+    opacity: "0",
+    pointerEvents: "none",
+    zIndex: "-1",
+    background: "#fff",
+  });
 
-  // Extract <body> contents from the built HTML so styles + markup render in-page
+  // Extract <body> contents and <style> from the built HTML and inject them
+  // into the container. The style may contain universal selectors that
+  // briefly affect the whole document during capture, but the container is
+  // opacity:0 and removed ~1s later, so the user never perceives it.
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
   const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
   container.innerHTML =
@@ -400,19 +417,37 @@ export async function downloadPDF(result) {
   const filename = `SafeCouncil-Report-${safeName}.pdf`;
 
   try {
+    // Wait for web fonts (DM Sans / DM Mono are @imported from Google Fonts
+    // in the template) to finish loading before html2canvas samples pixels.
+    // Without this the capture may fire before glyphs paint and produce a
+    // blank or missing-text canvas.
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+    // Give the layout engine one frame to settle after insertion.
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
     const html2pdf = (await import("html2pdf.js")).default;
     await html2pdf()
       .set({
         margin: [10, 10, 10, 10],
         filename,
         image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          windowWidth: 794,
+          logging: false,
+        },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         pagebreak: { mode: ["css", "legacy"] },
       })
       .from(container)
       .save();
   } finally {
-    document.body.removeChild(container);
+    if (container.parentNode) {
+      container.parentNode.removeChild(container);
+    }
   }
 }
