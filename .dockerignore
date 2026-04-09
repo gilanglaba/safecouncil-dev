@@ -1,0 +1,49 @@
+# Keep the Docker build context small and reproducible.
+# Anything listed here is NOT sent to the Docker daemon during `docker build`.
+
+# Version control
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+venv
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Node / frontend build artifacts — the Dockerfile builds fresh inside the image
+node_modules
+frontend/node_modules
+frontend/dist
+
+# Runtime outputs that must never be baked into an image
+backend/logs/*.json
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
+
+# IDE / editor / OS cruft
+.idea
+.vscode
+.DS_Store
+*.swp
+*.swo
+
+# Reference projects (vendored from Team1/Team8) — tens of MB of unrelated code
+reference/
+
+# Test and planning scaffolding not needed at runtime
+tests/
+.claude/
+.claude-plans/
+
+# Docs and CI configs (keep README.md for `docker run` help surface if desired)
+*.md
+!README.md

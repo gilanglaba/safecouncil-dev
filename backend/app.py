@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 # Ensure backend/ is on the path so imports work correctly
@@ -22,7 +22,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+# Static directory for the built React frontend.
+# In Docker: the Dockerfile sets STATIC_DIR=/app/frontend/dist after running
+# `npm run build`, so Flask serves the compiled SPA directly.
+# In local dev (make dev): STATIC_DIR is unset and frontend/dist typically
+# doesn't exist. Vite serves the frontend on :3000 and proxies /api/* to
+# Flask on :5000, so Flask never needs to serve static files. The SPA
+# catch-all route below is only registered when the dist directory actually
+# exists, so local dev behavior is byte-identical to before.
+_STATIC_DIR = os.environ.get(
+    "STATIC_DIR",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist"),
+)
+_SERVE_STATIC = os.path.isdir(_STATIC_DIR)
+
+if _SERVE_STATIC:
+    # static_folder=None disables Flask's built-in /<path:filename> static
+    # handler — otherwise it would intercept SPA deep links like /evaluator
+    # and return 404 before reaching our catch-all. We serve static files
+    # ourselves from the catch-all route below.
+    app = Flask(__name__, static_folder=None)
+    logger.info(f"Flask will serve static SPA from {_STATIC_DIR}")
+else:
+    app = Flask(__name__)
 CORS(app, origins="*")  # Allow all origins in development; restrict in production
 
 # Single shared evaluation service instance
@@ -469,6 +491,29 @@ def method_not_allowed(e):
 def internal_error(e):
     logger.error(f"Unhandled server error: {e}", exc_info=True)
     return jsonify({"error": "Internal server error"}), 500
+
+
+# ---------------------------------------------------------------------------
+# SPA catch-all — only registered when a built frontend/dist exists
+# ---------------------------------------------------------------------------
+# In a Docker container (where STATIC_DIR points at the compiled React app)
+# this route serves index.html for any non-/api path so that React Router
+# client-side routes like /evaluator, /dashboard, /about keep working after
+# a browser refresh. In local dev with `make dev`, dist/ typically does not
+# exist, so this block is skipped entirely and Vite on :3000 owns the UI.
+
+if _SERVE_STATIC:
+    @app.route("/", defaults={"path": ""})
+    @app.route("/<path:path>")
+    def _spa_catch_all(path):
+        # Explicit JSON 404 for unknown /api/* so the client sees an error
+        # rather than an unexpected HTML payload.
+        if path.startswith("api/") or path.startswith("api"):
+            return jsonify({"error": "Not found"}), 404
+        full_path = os.path.join(_STATIC_DIR, path)
+        if path and os.path.isfile(full_path):
+            return send_from_directory(_STATIC_DIR, path)
+        return send_from_directory(_STATIC_DIR, "index.html")
 
 
 # ---------------------------------------------------------------------------
