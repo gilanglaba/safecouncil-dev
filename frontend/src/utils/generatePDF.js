@@ -16,15 +16,19 @@
 /**
  * Trigger a PDF download for the given evaluation result.
  *
- * @param {object} result — evaluation result object. Must contain `eval_id`
- *                          and may contain `agent_name` (used for the filename).
+ * POSTs the full result object to /api/pdf so the backend never has to
+ * look up anything by eval_id. This matters for Dashboard demo cards
+ * (demo-verimedia, demo-unicef, demo-wfp1) which live only in the
+ * frontend and have no corresponding audit log on disk.
+ *
+ * @param {object} result — evaluation result object. May contain
+ *                          `agent_name` (used for the filename).
  */
 export async function downloadPDF(result) {
-  const evalId = result && result.eval_id;
-  if (!evalId) {
+  if (!result || typeof result !== "object") {
     // eslint-disable-next-line no-console
-    console.error("[generatePDF] Cannot download PDF: result has no eval_id", result);
-    alert("Cannot download PDF: this evaluation has no eval_id yet.");
+    console.error("[generatePDF] Cannot download PDF: result is missing or not an object", result);
+    alert("Cannot download PDF: no evaluation data available.");
     return;
   }
 
@@ -32,9 +36,13 @@ export async function downloadPDF(result) {
   const filename = `SafeCouncil-Report-${safeName}.pdf`;
 
   try {
-    const response = await fetch(`/api/evaluate/${encodeURIComponent(evalId)}/pdf`, {
-      method: "GET",
-      headers: { Accept: "application/pdf" },
+    const response = await fetch("/api/pdf", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/pdf",
+      },
+      body: JSON.stringify(result),
     });
 
     if (!response.ok) {

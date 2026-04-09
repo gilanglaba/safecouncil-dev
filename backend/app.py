@@ -297,6 +297,46 @@ def get_evaluation_pdf(eval_id):
         return jsonify({"error": "Failed to generate PDF report."}), 500
 
 
+@app.route("/api/pdf", methods=["POST"])
+def post_evaluation_pdf():
+    """
+    Render a PDF from a complete evaluation result supplied in the request
+    body. Used by the frontend for both real evaluations (already fetched
+    and displayed) and demo cards (frontend-only fixtures that never hit
+    the backend's storage layer).
+    """
+    from services.pdf_service import generate_pdf
+    from flask import send_file
+    from io import BytesIO
+
+    try:
+        result = request.get_json(silent=True)
+        if not isinstance(result, dict) or not result:
+            return jsonify({"error": "Request body must be a non-empty JSON object."}), 400
+
+        pdf_bytes = generate_pdf(result)
+
+        agent_name = (result.get("agent_name") or "evaluation").replace(" ", "_")
+        content_type = "application/pdf"
+        filename = f"safecouncil-report-{agent_name}.pdf"
+        # If xhtml2pdf isn't installed, pdf_service falls back to HTML.
+        # Adjust the mime + extension so the browser downloads something
+        # sensible instead of a mislabeled file.
+        if pdf_bytes[:5] == b"<!DOC" or pdf_bytes[:5] == b"<html":
+            content_type = "text/html"
+            filename = filename.replace(".pdf", ".html")
+
+        return send_file(
+            BytesIO(pdf_bytes),
+            mimetype=content_type,
+            as_attachment=True,
+            download_name=filename,
+        )
+    except Exception as e:
+        logger.error(f"Error generating PDF (POST /api/pdf): {e}", exc_info=True)
+        return jsonify({"error": "Failed to generate PDF report."}), 500
+
+
 @app.route("/api/evaluations", methods=["GET"])
 def list_evaluations():
     """
