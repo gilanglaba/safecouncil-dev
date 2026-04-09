@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer";
 import VerdictBadge from "../components/VerdictBadge";
-import { downloadPDF } from "../utils/generatePDF";
+import PrintableReport from "../components/PrintableReport";
+import { triggerPrint } from "../utils/generatePDF";
 import { theme, getScoreColor } from "../theme";
 import { api } from "../api";
 import { DEMO_RESULT, DEMO_RESULT_AGGREGATE, DEMO_RESULT_VERIMEDIA } from "../demoResult";
@@ -166,6 +167,9 @@ export default function DashboardPage() {
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Result being printed right now. When non-null, a hidden
+  // <PrintableReport> is mounted for it and the browser print dialog fires.
+  const [printingResult, setPrintingResult] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -180,6 +184,16 @@ export default function DashboardPage() {
       });
   }, []);
 
+  // Once a printingResult is mounted, wait for layout then open the dialog.
+  // Clear state on afterprint so the DOM is clean for the next click.
+  useEffect(() => {
+    if (!printingResult) return;
+    const onAfterPrint = () => setPrintingResult(null);
+    window.addEventListener("afterprint", onAfterPrint);
+    triggerPrint();
+    return () => window.removeEventListener("afterprint", onAfterPrint);
+  }, [printingResult]);
+
   const handleSeeDetail = (evalId) => {
     navigate(`/results/${evalId}`);
   };
@@ -188,17 +202,17 @@ export default function DashboardPage() {
     try {
       if (isDemo) {
         const demoData = evalId === "demo-unicef" ? DEMO_RESULT_AGGREGATE : evalId === "demo-verimedia" ? DEMO_RESULT_VERIMEDIA : DEMO_RESULT;
-        downloadPDF({ ...demoData, timestamp: new Date().toISOString() });
+        setPrintingResult({ ...demoData, timestamp: new Date().toISOString() });
         return;
       }
       const { status, data } = await api.getResult(evalId);
       if (status === 200) {
-        downloadPDF(data);
+        setPrintingResult(data);
       } else {
         alert("Could not load evaluation data for PDF export.");
       }
     } catch {
-      alert("Failed to generate PDF. Is the backend running?");
+      alert("Failed to load evaluation data.");
     }
   };
 
@@ -213,8 +227,9 @@ export default function DashboardPage() {
 
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: theme.bg }}>
-      <Nav />
+    <>
+      <div className="sc-screen" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: theme.bg }}>
+        <Nav />
 
       <main style={{ flex: 1, padding: "48px 24px", maxWidth: 960, margin: "0 auto", width: "100%" }}>
         {/* Header */}
@@ -282,7 +297,17 @@ export default function DashboardPage() {
         )}
       </main>
 
-      <Footer />
-    </div>
+        <Footer />
+      </div>
+
+      {/* Hidden on screen, shown by @media print CSS when a row's
+          Download PDF button is clicked. Rendering is state-driven so only
+          the selected row's report is in the DOM at print time. */}
+      {printingResult && (
+        <div className="sc-printable">
+          <PrintableReport result={printingResult} />
+        </div>
+      )}
+    </>
   );
 }

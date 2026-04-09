@@ -3,7 +3,8 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer";
 import VerdictBadge from "../components/VerdictBadge";
-import { downloadPDF } from "../utils/generatePDF";
+import { triggerPrint } from "../utils/generatePDF";
+import PrintableReport from "../components/PrintableReport";
 import SeverityBadge from "../components/SeverityBadge";
 import Badge from "../components/Badge";
 import { theme, getSpeakerColor, getScoreColor } from "../theme";
@@ -1466,48 +1467,60 @@ export default function ResultsPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: theme.bg }}>
-      <Nav />
+    <>
+      {/* Normal on-screen page. Hidden during print by @media print CSS. */}
+      <div className="sc-screen" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: theme.bg }}>
+        <Nav />
 
-      <main style={{ flex: 1, maxWidth: 1100, margin: "0 auto", width: "100%", padding: "40px 24px" }}>
-        <Link
-          to="/dashboard"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 13,
-            color: theme.textTer,
-            textDecoration: "none",
-            marginBottom: 20,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = theme.violet; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = theme.textTer; }}
-        >
-          ← Back to Dashboard
-        </Link>
+        <main style={{ flex: 1, maxWidth: 1100, margin: "0 auto", width: "100%", padding: "40px 24px" }}>
+          <Link
+            to="/dashboard"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13,
+              color: theme.textTer,
+              textDecoration: "none",
+              marginBottom: 20,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = theme.violet; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = theme.textTer; }}
+          >
+            ← Back to Dashboard
+          </Link>
 
-        {loading && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 24px", color: theme.textSec }}>
-            <div style={{ width: 36, height: 36, border: `3px solid ${theme.border}`, borderTopColor: theme.violet, borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            Loading results...
-          </div>
-        )}
+          {loading && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 24px", color: theme.textSec }}>
+              <div style={{ width: 36, height: 36, border: `3px solid ${theme.border}`, borderTopColor: theme.violet, borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              Loading results...
+            </div>
+          )}
 
-        {error && (
-          <div style={{ background: theme.redPale, border: `1px solid ${theme.redBorder}`, borderRadius: theme.radiusMd, padding: "20px 24px", color: theme.red }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Error loading results</div>
-            <div style={{ fontSize: 14 }}>{error}</div>
-          </div>
-        )}
+          {error && (
+            <div style={{ background: theme.redPale, border: `1px solid ${theme.redBorder}`, borderRadius: theme.radiusMd, padding: "20px 24px", color: theme.red }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Error loading results</div>
+              <div style={{ fontSize: 14 }}>{error}</div>
+            </div>
+          )}
 
-        {!loading && !error && result && (
-          <ResultsView result={result} onDownloadPDF={() => downloadPDF(result)} />
-        )}
-      </main>
+          {!loading && !error && result && (
+            <ResultsView result={result} onDownloadPDF={triggerPrint} />
+          )}
+        </main>
 
-      <Footer />
-    </div>
+        <Footer />
+      </div>
+
+      {/* Hidden on screen, shown during print via @media print CSS.
+          Mounted whenever a result is loaded so the browser's print dialog
+          has something to render the moment the user clicks Download PDF. */}
+      {!loading && !error && result && (
+        <div className="sc-printable">
+          <PrintableReport result={result} />
+        </div>
+      )}
+    </>
   );
 }

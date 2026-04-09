@@ -1,36 +1,69 @@
 /**
- * PrintResultsPage — a minimal, print-optimized rendering of an evaluation
- * result. This route exists to be opened in a new tab and immediately
- * printed via the browser's native print-to-PDF dialog.
+ * PrintableReport — a print-optimized React rendering of an evaluation
+ * result. Meant to be embedded inside any page that needs to offer a
+ * "Download PDF" action. The host page renders this in a hidden container
+ * and the print CSS (see ensurePrintStyles below) swaps it to visible
+ * during browser print, hiding the normal page chrome.
  *
  * Flow:
- *   1. User clicks "Download PDF" on ResultsPage or DashboardPage.
- *   2. downloadPDF() in utils/generatePDF.js stashes the result in
- *      sessionStorage and opens this route in a new tab.
- *   3. This component reads the result (from sessionStorage for demos or
- *      fresh eval, or from the /api/evaluate endpoint as a fallback).
- *   4. Once data is loaded and painted, it calls window.print() once.
- *   5. The browser's print dialog opens; the user picks "Save as PDF".
+ *   1. Host page mounts <PrintableReport result={...} /> inside a
+ *      <div className="sc-printable">.
+ *   2. Host page wraps its normal on-screen content in <div className="sc-screen">.
+ *   3. Host calls window.print() on a user action.
+ *   4. @media print CSS hides .sc-screen and shows .sc-printable, so the
+ *      print preview displays this component and nothing else.
+ *   5. User picks "Save as PDF" in the browser's print dialog.
  *
- * Why window.print() instead of html2canvas or server-side PDF? Because
- * the browser renders CSS flexbox, gradients, and fonts natively with
- * zero compromise, and the user gets byte-perfect visual fidelity with
- * the on-screen ResultsPage. See prior PDF attempts in generatePDF.js
- * git history for why other approaches didn't work.
+ * This module also exports ensurePrintStyles(), which injects the global
+ * print stylesheet once into document.head (idempotent).
  */
 
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import React, { useEffect } from "react";
 import { theme } from "../theme";
-import VerdictBadge from "../components/VerdictBadge";
-import SeverityBadge from "../components/SeverityBadge";
-import { api } from "../api";
-import {
-  DEMO_RESULT,
-  DEMO_RESULT_AGGREGATE,
-  DEMO_RESULT_VERIMEDIA,
-} from "../demoResult";
+import VerdictBadge from "./VerdictBadge";
+import SeverityBadge from "./SeverityBadge";
 
+// ── Global print stylesheet — injected once per page load ────────────────
+const PRINT_STYLE_ID = "sc-print-style";
+const PRINT_CSS = `
+  /* On-screen: the printable container is invisible. The normal page
+     content (inside .sc-screen) is visible. */
+  .sc-printable { display: none; }
+
+  @media print {
+    /* Strip browser default margins and background so the PDF is edge-to-edge. */
+    @page { size: A4 portrait; margin: 15mm 14mm; }
+    html, body { background: #ffffff !important; }
+
+    /* Hide the entire normal page chrome (nav, tabs, ResultsView, footer). */
+    .sc-screen { display: none !important; }
+
+    /* Show the printable report. */
+    .sc-printable { display: block !important; }
+
+    /* Keep color accents (verdict banners, score tiles, etc.) visible in
+       the print preview — Chromium strips backgrounds by default otherwise. */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    /* Avoid awkward mid-card splits where possible. */
+    .sc-avoid-break { page-break-inside: avoid; }
+    .sc-page-break { page-break-before: always; }
+  }
+`;
+
+export function ensurePrintStyles() {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(PRINT_STYLE_ID)) return;
+  const el = document.createElement("style");
+  el.id = PRINT_STYLE_ID;
+  el.textContent = PRINT_CSS;
+  document.head.appendChild(el);
+}
+
+// ── Small helpers ─────────────────────────────────────────────────────────
 function getScoreColor(score) {
   if (score >= 80) return theme.green;
   if (score >= 60) return theme.amber;
@@ -59,95 +92,44 @@ function formatTimestamp(ts) {
   }
 }
 
-// ── Print CSS — injected once into the document head ─────────────────────
-// Controls page size, margins, page breaks, and hides elements (like the
-// "Print" helper button) that should not appear in the PDF.
-const PRINT_STYLE_ID = "safecouncil-print-style";
-const PRINT_CSS = `
-  @page { size: A4 portrait; margin: 15mm 14mm; }
-  html, body { background: #ffffff !important; }
-  .no-print { display: none !important; }
-  .print-page { padding: 0 !important; max-width: none !important; }
-  .page-break { page-break-before: always; }
-  .avoid-break { page-break-inside: avoid; }
-  /* Keep color accents visible in print (Chromium default is to strip) */
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-`;
-
-function ensurePrintStyle() {
-  if (document.getElementById(PRINT_STYLE_ID)) return;
-  const el = document.createElement("style");
-  el.id = PRINT_STYLE_ID;
-  el.setAttribute("media", "print");
-  el.textContent = PRINT_CSS;
-  document.head.appendChild(el);
+function SectionTitle({ children }) {
+  return (
+    <div
+      style={{
+        fontSize: 13,
+        fontWeight: 700,
+        color: theme.violet,
+        borderBottom: `2px solid ${theme.violet}`,
+        paddingBottom: 3,
+        marginBottom: 8,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
+const thStyle = {
+  fontSize: 9,
+  fontWeight: 700,
+  color: theme.violet,
+  padding: "6px 8px",
+  borderBottom: `1px solid ${theme.violet}`,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  textAlign: "center",
+};
+
+const tdStyle = { padding: "5px 8px", verticalAlign: "top" };
+
 // ── Main component ────────────────────────────────────────────────────────
-export default function PrintResultsPage() {
-  const { id } = useParams();
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-
-  // Load result — sessionStorage first (set by downloadPDF), then demo
-  // fixtures, then API fallback.
+export default function PrintableReport({ result }) {
+  // Ensure the print stylesheet is installed on mount (idempotent).
   useEffect(() => {
-    ensurePrintStyle();
+    ensurePrintStyles();
+  }, []);
 
-    const cacheKey = `print-result-${id}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached) {
-      try {
-        setResult(JSON.parse(cached));
-        return;
-      } catch {
-        // fall through to other sources
-      }
-    }
-
-    if (id === "demo" || id === "demo-wfp1") {
-      setResult({ ...DEMO_RESULT, timestamp: new Date().toISOString() });
-      return;
-    }
-    if (id === "demo-unicef") {
-      setResult({ ...DEMO_RESULT_AGGREGATE, timestamp: new Date().toISOString() });
-      return;
-    }
-    if (id === "demo-verimedia") {
-      setResult({ ...DEMO_RESULT_VERIMEDIA, timestamp: new Date().toISOString() });
-      return;
-    }
-
-    api.getResult(id)
-      .then(({ status, data }) => {
-        if (status === 200 && data) setResult(data);
-        else setError("Could not load evaluation data.");
-      })
-      .catch(() => setError("Could not load evaluation data."));
-  }, [id]);
-
-  // Auto-trigger the browser's print dialog once the result is rendered.
-  // Use a short delay so React finishes painting fonts and layout first.
-  useEffect(() => {
-    if (!result) return;
-    const t = setTimeout(() => window.print(), 600);
-    return () => clearTimeout(t);
-  }, [result]);
-
-  if (error) {
-    return (
-      <div style={{ padding: 40, fontFamily: theme.fontSans, color: theme.red }}>
-        {error}
-      </div>
-    );
-  }
-  if (!result) {
-    return (
-      <div style={{ padding: 40, fontFamily: theme.fontSans, color: theme.textSec }}>
-        Loading evaluation…
-      </div>
-    );
-  }
+  if (!result) return null;
 
   const verdict = result.verdict || {};
   const verdictColors = {
@@ -161,7 +143,7 @@ export default function PrintResultsPage() {
     ? Math.round(assessments.reduce((s, a) => s + (a.overall_score || 0), 0) / assessments.length)
     : 0;
 
-  // Group each expert's dimensions by category
+  // Group dimensions by category and build a per-dimension score map.
   const firstExpert = assessments[0];
   const categories = [];
   if (firstExpert) {
@@ -173,8 +155,6 @@ export default function PrintResultsPage() {
       }
     }
   }
-
-  // Build a {dimension: [scoreByExpert]} map for the side-by-side table
   const allDimensions = [];
   const scoreByDim = {};
   if (firstExpert) {
@@ -190,11 +170,9 @@ export default function PrintResultsPage() {
   const mitigations = result.mitigations || [];
   const agreements = result.agreements || [];
   const disagreements = result.disagreements || [];
-  const isDeliberative = (result.orchestrator_method || "deliberative") === "deliberative";
 
   return (
     <div
-      className="print-page"
       style={{
         fontFamily: theme.fontSans,
         color: theme.text,
@@ -206,43 +184,6 @@ export default function PrintResultsPage() {
         lineHeight: 1.5,
       }}
     >
-      {/* ─── On-screen helper bar (hidden in print) ─── */}
-      <div
-        className="no-print"
-        style={{
-          background: theme.violetPale,
-          border: `1px solid ${theme.violet}33`,
-          borderRadius: 8,
-          padding: "10px 14px",
-          marginBottom: 20,
-          fontSize: 12,
-          color: theme.textSec,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <div>
-          <strong style={{ color: theme.violet }}>Print preview.</strong> The browser's print
-          dialog should open automatically. Pick <strong>"Save as PDF"</strong> as the destination.
-        </div>
-        <button
-          onClick={() => window.print()}
-          style={{
-            background: theme.violet,
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            padding: "8px 16px",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          Open print dialog
-        </button>
-      </div>
-
       {/* ─── Brand header ─── */}
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: theme.violet, letterSpacing: "-0.01em" }}>
@@ -268,9 +209,7 @@ export default function PrintResultsPage() {
           </div>
           <div style={{ fontSize: 11, color: theme.textSec, marginTop: 2 }}>
             Evaluation ID: <code style={{ fontFamily: theme.fontMono, fontSize: 10 }}>{result.eval_id || "—"}</code>
-            {" · "}
-            {formatTimestamp(result.timestamp)}
-            {" · "}
+            {" · "}{formatTimestamp(result.timestamp)}{" · "}
             <span style={{ textTransform: "capitalize" }}>{result.orchestrator_method || "deliberative"}</span> method
           </div>
         </div>
@@ -287,7 +226,7 @@ export default function PrintResultsPage() {
 
       {/* ─── Verdict banner ─── */}
       <div
-        className="avoid-break"
+        className="sc-avoid-break"
         style={{
           background: vc.bg,
           border: `1.5px solid ${vc.border}`,
@@ -305,12 +244,8 @@ export default function PrintResultsPage() {
           <div>
             <div
               style={{
-                fontSize: 9,
-                fontWeight: 700,
-                color: vc.text,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                marginBottom: 2,
+                fontSize: 9, fontWeight: 700, color: vc.text,
+                textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2,
               }}
             >
               Council Final Verdict
@@ -340,7 +275,7 @@ export default function PrintResultsPage() {
       {/* ─── Executive summary ─── */}
       {result.executive_summary && (
         <div
-          className="avoid-break"
+          className="sc-avoid-break"
           style={{
             background: theme.violetPale,
             borderLeft: `4px solid ${theme.violet}`,
@@ -351,12 +286,8 @@ export default function PrintResultsPage() {
         >
           <div
             style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: theme.violet,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              marginBottom: 6,
+              fontSize: 10, fontWeight: 700, color: theme.violet,
+              textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6,
             }}
           >
             Executive Summary
@@ -365,9 +296,9 @@ export default function PrintResultsPage() {
         </div>
       )}
 
-      {/* ─── Mitigations — action-first, promoted above expert detail ─── */}
+      {/* ─── Mitigations ─── */}
       {mitigations.length > 0 && (
-        <div className="avoid-break" style={{ marginBottom: 16 }}>
+        <div className="sc-avoid-break" style={{ marginBottom: 16 }}>
           <SectionTitle>Required Mitigations</SectionTitle>
           <table
             style={{
@@ -410,9 +341,9 @@ export default function PrintResultsPage() {
         </div>
       )}
 
-      {/* ─── Score comparison — experts side by side across a single table ─── */}
+      {/* ─── Score comparison ─── */}
       {assessments.length > 0 && (
-        <div className="page-break" style={{ marginBottom: 16 }}>
+        <div className="sc-page-break" style={{ marginBottom: 16 }}>
           <SectionTitle>Expert Score Comparison</SectionTitle>
           <table
             style={{
@@ -442,12 +373,8 @@ export default function PrintResultsPage() {
                     <td
                       colSpan={assessments.length + 1}
                       style={{
-                        padding: "6px 8px 3px",
-                        fontSize: 9,
-                        fontWeight: 700,
-                        color: theme.violet,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
+                        padding: "6px 8px 3px", fontSize: 9, fontWeight: 700,
+                        color: theme.violet, textTransform: "uppercase", letterSpacing: "0.06em",
                       }}
                     >
                       {cat}
@@ -466,9 +393,7 @@ export default function PrintResultsPage() {
                             <td
                               key={i}
                               style={{
-                                ...tdStyle,
-                                textAlign: "center",
-                                fontFamily: theme.fontMono,
+                                ...tdStyle, textAlign: "center", fontFamily: theme.fontMono,
                                 fontWeight: 700,
                                 color: s != null ? getScoreColor(s) : theme.textTer,
                               }}
@@ -486,19 +411,16 @@ export default function PrintResultsPage() {
         </div>
       )}
 
-      {/* ─── Council consensus (agreements + disagreements) ─── */}
+      {/* ─── Council consensus ─── */}
       {(agreements.length > 0 || disagreements.length > 0) && (
-        <div className="avoid-break" style={{ marginBottom: 16 }}>
+        <div className="sc-avoid-break" style={{ marginBottom: 16 }}>
           <SectionTitle>Council Consensus</SectionTitle>
           <div style={{ display: "flex", gap: 12 }}>
             {agreements.length > 0 && (
               <div
                 style={{
-                  flex: 1,
-                  background: theme.greenPale,
-                  border: `1px solid ${theme.greenBorder}`,
-                  borderRadius: 8,
-                  padding: "12px 14px",
+                  flex: 1, background: theme.greenPale, border: `1px solid ${theme.greenBorder}`,
+                  borderRadius: 8, padding: "12px 14px",
                 }}
               >
                 <div style={{ fontSize: 10, fontWeight: 700, color: theme.green, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -516,11 +438,8 @@ export default function PrintResultsPage() {
             {disagreements.length > 0 && (
               <div
                 style={{
-                  flex: 1,
-                  background: theme.amberPale,
-                  border: `1px solid ${theme.amberBorder}`,
-                  borderRadius: 8,
-                  padding: "12px 14px",
+                  flex: 1, background: theme.amberPale, border: `1px solid ${theme.amberBorder}`,
+                  borderRadius: 8, padding: "12px 14px",
                 }}
               >
                 <div style={{ fontSize: 10, fontWeight: 700, color: theme.amber, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -543,12 +462,12 @@ export default function PrintResultsPage() {
         </div>
       )}
 
-      {/* ─── Per-expert findings (top severity only) ─── */}
+      {/* ─── Per-expert findings ─── */}
       {assessments.some((a) => a.findings && a.findings.length > 0) && (
-        <div className="page-break" style={{ marginBottom: 16 }}>
+        <div className="sc-page-break" style={{ marginBottom: 16 }}>
           <SectionTitle>Key Findings by Expert</SectionTitle>
           {assessments.map((a, i) => (
-            <div key={i} className="avoid-break" style={{ marginBottom: 12 }}>
+            <div key={i} className="sc-avoid-break" style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: theme.text, marginBottom: 4 }}>
                 {a.expert_name}
               </div>
@@ -557,9 +476,7 @@ export default function PrintResultsPage() {
                   key={j}
                   style={{
                     borderLeft: `3px solid ${theme.border}`,
-                    paddingLeft: 10,
-                    marginBottom: 6,
-                    fontSize: 10,
+                    paddingLeft: 10, marginBottom: 6, fontSize: 10,
                   }}
                 >
                   <div style={{ marginBottom: 2 }}>
@@ -582,13 +499,10 @@ export default function PrintResultsPage() {
       {/* ─── Footer ─── */}
       <div
         style={{
-          marginTop: 24,
-          paddingTop: 10,
+          marginTop: 24, paddingTop: 10,
           borderTop: `1px solid ${theme.borderSubtle}`,
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: 9,
-          color: theme.textTer,
+          display: "flex", justifyContent: "space-between",
+          fontSize: 9, color: theme.textTer,
         }}
       >
         <div>SafeCouncil — Council of Experts AI Safety Evaluation Platform</div>
@@ -597,37 +511,3 @@ export default function PrintResultsPage() {
     </div>
   );
 }
-
-// ── Small helpers ─────────────────────────────────────────────────────────
-function SectionTitle({ children }) {
-  return (
-    <div
-      style={{
-        fontSize: 13,
-        fontWeight: 700,
-        color: theme.violet,
-        borderBottom: `2px solid ${theme.violet}`,
-        paddingBottom: 3,
-        marginBottom: 8,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-const thStyle = {
-  fontSize: 9,
-  fontWeight: 700,
-  color: theme.violet,
-  padding: "6px 8px",
-  borderBottom: `1px solid ${theme.violet}`,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  textAlign: "center",
-};
-
-const tdStyle = {
-  padding: "5px 8px",
-  verticalAlign: "top",
-};
