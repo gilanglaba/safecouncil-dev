@@ -14,7 +14,7 @@ Live demo: [safecouncil.vercel.app](https://safecouncil.vercel.app)
 
 ## Quick Start
 
-**Prerequisites:** Python 3.11+, Node.js 18+. API keys are optional — without them, SafeCouncil automatically runs in demo mode and you can still see the full synthesis pipeline end-to-end (see [Demo Mode](#demo-mode-run-without-api-keys) below).
+**Prerequisites:** Python 3.11+ and Node.js 18+. Installation guides for Python and Node.js can be found at [python.org](https://www.python.org/downloads/) and [nodejs.org](https://nodejs.org/). API keys are optional — without them, SafeCouncil automatically runs in demo mode and you can still see the full synthesis pipeline end-to-end (see [Demo Mode](#demo-mode-run-without-api-keys) below).
 
 ### One-command (Makefile)
 
