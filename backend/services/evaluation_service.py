@@ -129,13 +129,19 @@ class EvaluationService:
                         "timestamp": r.get("timestamp", ""),
                     })
                 else:
+                    # r is a CouncilResult dataclass — compute overall_score
+                    # from expert_assessments (CouncilResult has no top-level
+                    # score field) and read orchestrator_method from the
+                    # dataclass instead of hardcoding an empty string.
+                    scores = [a.overall_score for a in r.expert_assessments]
+                    avg_score = round(sum(scores) / len(scores)) if scores else 0
                     result.append({
                         "eval_id": r.eval_id,
                         "agent_name": r.agent_name,
                         "verdict": r.final_verdict.value,
                         "confidence": r.confidence,
-                        "overall_score": 0,
-                        "orchestrator_method": "",
+                        "overall_score": avg_score,
+                        "orchestrator_method": r.orchestrator_method,
                         "timestamp": r.timestamp,
                     })
         return sorted(result, key=lambda x: x["timestamp"], reverse=True)
