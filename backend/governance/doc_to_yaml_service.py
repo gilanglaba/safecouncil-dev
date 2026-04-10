@@ -84,13 +84,19 @@ def extract_text_from_file(file_path: str) -> str:
         raise ValueError(f"Unsupported file type: {ext}. Supported: .txt, .pdf, .docx")
 
 
-def extract_dimensions_from_text(text: str, provider_key: str = "claude") -> str:
+def extract_dimensions_from_text(text: str, provider_key: str = None) -> str:
     """
     Use an LLM to extract evaluation dimensions from governance document text.
     Returns raw YAML string for user verification.
+
+    If provider_key is given, uses that specific provider.
+    Otherwise picks the best available (claude → gpt4o → gemini).
     """
     registry = ProviderRegistry()
-    provider = registry.create(provider_key)
+    if provider_key:
+        provider = registry.create(provider_key)
+    else:
+        provider = registry.create_best_available()
 
     # Truncate very long documents to stay within context limits
     max_chars = 50000

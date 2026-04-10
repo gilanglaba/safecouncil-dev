@@ -1,6 +1,8 @@
 """
-ProbeService — generates test prompts using Claude and probes a target AI agent API.
+ProbeService — generates test prompts and probes a target AI agent API.
 Used when input_method == "api_probe" in POST /api/evaluate.
+
+Provider-agnostic: accepts any LLMProvider (Claude, GPT-4o, Gemini, local).
 """
 
 import json
@@ -28,32 +30,27 @@ Make prompts realistic and varied. Adversarial prompts should attempt prompt inj
 
 class ProbeService:
     """
-    Generates test prompts with Claude and probes a target AI API.
+    Generates test prompts and probes a target AI API.
 
+    Provider-agnostic — works with any LLMProvider instance.
     The probe_target_api method uses the OpenAI-compatible chat completions
     format, which is supported by most modern AI API endpoints.
     """
 
-    def __init__(self, anthropic_api_key: str, model: str):
-        self.api_key = anthropic_api_key
-        self.model = model
-        self._client = None
-
-    def _get_client(self):
-        if self._client is None:
-            import anthropic
-            self._client = anthropic.Anthropic(api_key=self.api_key)
-        return self._client
+    def __init__(self, provider):
+        """
+        Args:
+            provider: An LLMProvider instance (Claude, GPT-4o, Gemini, etc.)
+        """
+        self.provider = provider
 
     def generate_test_prompts(self, use_case: str, probe_count: int) -> list:
         """
-        Use Claude to generate categorised test prompts for the target agent.
+        Use an LLM to generate categorised test prompts for the target agent.
 
         Returns a list of dicts: [{category, label, prompt}, ...]
         Falls back to a built-in set of generic prompts if the API call fails.
         """
-        client = self._get_client()
-
         # Distribute probes across categories
         counts = self._distribute_probes(probe_count)
 
@@ -73,15 +70,14 @@ Return a JSON array of exactly {probe_count} objects. Each object must have: cat
 """
 
         try:
-            response = client.messages.create(
-                model=self.model,
+            response = self.provider.call(
+                system_prompt=_GENERATE_PROMPTS_SYSTEM,
+                user_message=user_message,
                 max_tokens=4096,
-                system=_GENERATE_PROMPTS_SYSTEM,
-                messages=[{"role": "user", "content": user_message}],
             )
-            raw = response.content[0].text
+            raw = response.text
             prompts = self._extract_json_array(raw)
-            logger.info(f"[ProbeService] Generated {len(prompts)} test prompts")
+            logger.info(f"[ProbeService] Generated {len(prompts)} test prompts via {self.provider.provider_name}")
             return prompts[:probe_count]  # Ensure we don't exceed requested count
 
         except Exception as e:
@@ -213,7 +209,6 @@ Return a JSON array of exactly {probe_count} objects. Each object must have: cat
         """
         from models.schemas import Conversation
 
-        client = self._get_client()
         if custom_probes:
             probes = custom_probes[:probe_count] if probe_count else custom_probes
             logger.info(f"[ProbeService] Using {len(probes)} custom probes from agent profile")
@@ -240,13 +235,12 @@ Return a JSON array of exactly {probe_count} objects. Each object must have: cat
         user_message = f"Respond to each of these {len(probes)} inputs as the agent:\n\n{probe_list}"
 
         try:
-            response = client.messages.create(
-                model=self.model,
+            response = self.provider.call(
+                system_prompt=system_prompt,
+                user_message=user_message,
                 max_tokens=8192,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
             )
-            raw = response.content[0].text
+            raw = response.text
             results = self._extract_json_array(raw)
 
             conversations = []
@@ -260,7 +254,7 @@ Return a JSON array of exactly {probe_count} objects. Each object must have: cat
                         )
                     )
 
-            logger.info(f"[ProbeService] Simulated agent in 1 API call: {len(conversations)} conversations")
+            logger.info(f"[ProbeService] Simulated agent via {self.provider.provider_name}: {len(conversations)} conversations")
             return conversations
 
         except Exception as e:

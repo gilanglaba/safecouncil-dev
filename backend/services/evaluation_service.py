@@ -242,15 +242,12 @@ class EvaluationService:
                         step_offset = 0
                         logger.info(f"[{eval_id}] Loaded catalog data for tool '{tool_id}': {len(eval_input.conversations)} conversations")
                     elif tool_id in CATALOG_PROFILES:
-                        # Simulate agent via single Claude batch call
+                        # Simulate agent via single LLM batch call
                         profile = CATALOG_PROFILES[tool_id]
-                        self._update_step(job, 0, "running", f"Simulating {profile['agent_name']} via Claude...", 2)
+                        self._update_step(job, 0, "running", f"Simulating {profile['agent_name']}...", 2)
                         try:
                             from services.probe_service import ProbeService
-                            probe = ProbeService(
-                                anthropic_api_key=Config.ANTHROPIC_API_KEY,
-                                model=Config.CLAUDE_MODEL,
-                            )
+                            probe = ProbeService(provider=ProviderRegistry().create_best_available())
                             conversations = probe.simulate_agent_batch(
                                 agent_system_prompt=profile["system_prompt"],
                                 use_case=profile["use_case"],
@@ -282,16 +279,14 @@ class EvaluationService:
                     from services.github_ingestion_service import get_or_extract_profile
                     self._update_step(job, 0, "running", "Analyzing GitHub repository...", 2)
                     try:
-                        claude = ProviderRegistry().create("claude")
-                        profile, was_cached = get_or_extract_profile(api_config["github_url"], claude)
+                        registry = ProviderRegistry()
+                        llm_provider = registry.create_best_available()
+                        profile, was_cached = get_or_extract_profile(api_config["github_url"], llm_provider)
                         msg = "Loaded from cache" if was_cached else f"Extracted {profile['agent_name']}"
                         self._update_step(job, 0, "running", f"{msg} — simulating agent...", 6)
 
                         from services.probe_service import ProbeService
-                        probe = ProbeService(
-                            anthropic_api_key=Config.ANTHROPIC_API_KEY,
-                            model=Config.CLAUDE_MODEL,
-                        )
+                        probe = ProbeService(provider=llm_provider)
                         # Use interface-appropriate probes from the extracted profile
                         # (e.g., content snippets for a content analyzer, not chatbot questions)
                         conversations = probe.simulate_agent_batch(
@@ -323,14 +318,11 @@ class EvaluationService:
                 api_config = eval_input.api_config or {}
                 probe_count = max(1, int(api_config.get("probe_count", 20)))
 
-                # Step 0: Generate test prompts with Claude
-                self._update_step(job, 0, "running", "Generating test prompts with Claude...", 2)
+                # Step 0: Generate test prompts
+                self._update_step(job, 0, "running", "Generating test prompts...", 2)
                 try:
                     from services.probe_service import ProbeService
-                    probe = ProbeService(
-                        anthropic_api_key=Config.ANTHROPIC_API_KEY,
-                        model=Config.CLAUDE_MODEL,
-                    )
+                    probe = ProbeService(provider=ProviderRegistry().create_best_available())
                     test_prompts = probe.generate_test_prompts(eval_input.use_case, probe_count)
                     self._update_step(job, 0, "complete", f"Generated {len(test_prompts)} test prompts", 5)
                 except Exception as e:

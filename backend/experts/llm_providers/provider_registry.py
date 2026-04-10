@@ -116,6 +116,23 @@ class ProviderRegistry:
         key = os.getenv(config["api_key_env"], "") or config.get("default_api_key", "")
         return bool(key)
 
+    def create_best_available(self, preference: list = None) -> "LLMProvider":
+        """
+        Create the first available provider in preference order.
+        Defaults to claude → gpt4o → gemini → local.
+        Raises RuntimeError if no provider has a configured API key.
+        """
+        order = preference or ["claude", "gpt4o", "gemini", "local"]
+        for key in order:
+            if key in self._providers and self.is_available(key):
+                logger.info(f"Best available provider: '{key}'")
+                return self.create(key)
+        available = {k for k in self._providers if self.is_available(k)}
+        raise RuntimeError(
+            f"No LLM provider available. Configure at least one API key. "
+            f"Checked: {order}, found keys for: {available or 'none'}"
+        )
+
     def list_available(self) -> dict:
         """Return availability and model info for all registered providers."""
         result = {}
