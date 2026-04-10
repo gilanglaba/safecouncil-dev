@@ -259,7 +259,17 @@ Return a JSON array of exactly {probe_count} objects. Each object must have: cat
 
         except Exception as e:
             logger.error(f"[ProbeService] Agent simulation failed: {e}")
-            raise RuntimeError(f"Failed to simulate agent: {e}")
+            logger.warning("[ProbeService] Falling back to empty-output conversations")
+            conversations = []
+            for p in probes:
+                conversations.append(
+                    Conversation(
+                        label=p.get("label", f"Probe {len(conversations) + 1}"),
+                        prompt=p.get("prompt", ""),
+                        output="[Agent simulation failed — no response collected]",
+                    )
+                )
+            return conversations
 
     # ─────────────────────────────────────────────────────────────────────────
     # Helpers
@@ -278,29 +288,45 @@ Return a JSON array of exactly {probe_count} objects. Each object must have: cat
         }
 
     @staticmethod
+    def _unwrap_dict(data: dict) -> list:
+        """
+        If a dict contains a value that is a list of dicts, return that list.
+        Otherwise wrap the dict itself as [data].
+        Handles GPT-4o/Gemini wrapping arrays like {"results": [...]}.
+        """
+        for value in data.values():
+            if isinstance(value, list) and value and isinstance(value[0], dict):
+                return value
+        return [data]
+
+    @staticmethod
     def _extract_json_array(text: str) -> list:
         """Robustly extract a JSON array from LLM text."""
         stripped = text.strip()
 
-        # Try direct parse
+        # Strategy 1: Direct parse
         try:
             data = json.loads(stripped)
             if isinstance(data, list):
                 return data
+            if isinstance(data, dict):
+                return ProbeService._unwrap_dict(data)
         except json.JSONDecodeError:
             pass
 
-        # Try markdown code block
+        # Strategy 2: Markdown code block
         match = re.search(r"```(?:json)?\s*(.*?)\s*```", stripped, re.DOTALL)
         if match:
             try:
                 data = json.loads(match.group(1))
                 if isinstance(data, list):
                     return data
+                if isinstance(data, dict):
+                    return ProbeService._unwrap_dict(data)
             except json.JSONDecodeError:
                 pass
 
-        # Try finding first [...] block
+        # Strategy 3: Find first [...] block
         bracket_depth = 0
         start_idx = None
         for i, ch in enumerate(stripped):
@@ -317,6 +343,46 @@ Return a JSON array of exactly {probe_count} objects. Each object must have: cat
                             return data
                     except json.JSONDecodeError:
                         start_idx = None
+
+        # Strategy 4: Find first {...} block that contains a nested list-of-dicts.
+        # Only triggers for wrapper objects like {"results": [...]}, not bare objects
+        # (which are better handled by JSONL in Strategy 5).
+        brace_depth = 0
+        start_idx = None
+        for i, ch in enumerate(stripped):
+            if ch == "{":
+                if start_idx is None:
+                    start_idx = i
+                brace_depth += 1
+            elif ch == "}":
+                brace_depth -= 1
+                if brace_depth == 0 and start_idx is not None:
+                    try:
+                        data = json.loads(stripped[start_idx: i + 1])
+                        if isinstance(data, dict):
+                            unwrapped = ProbeService._unwrap_dict(data)
+                            # Only use if we actually found a nested list
+                            # (unwrap returns [data] when no nested list exists)
+                            if unwrapped is not data and unwrapped != [data]:
+                                return unwrapped
+                    except json.JSONDecodeError:
+                        pass
+                    start_idx = None
+
+        # Strategy 5: Newline-delimited JSON objects (JSONL)
+        objects = []
+        for line in stripped.splitlines():
+            line = line.strip().rstrip(",")
+            if not line or line.startswith("```"):
+                continue
+            try:
+                obj = json.loads(line)
+                if isinstance(obj, dict):
+                    objects.append(obj)
+            except json.JSONDecodeError:
+                continue
+        if objects:
+            return objects
 
         raise ValueError(f"Could not extract JSON array from response: {text[:300]}")
 

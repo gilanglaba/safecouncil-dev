@@ -4,6 +4,7 @@ Accepts an uploaded governance document (PDF/DOCX/TXT), extracts text,
 uses an LLM to translate governance requirements into evaluation dimension YAML,
 and returns it for user verification before saving.
 """
+import json
 import logging
 import os
 from typing import Optional
@@ -114,8 +115,23 @@ Return ONLY valid YAML as specified in your instructions."""
 
     response = provider.call(EXTRACTION_SYSTEM_PROMPT, user_message, max_tokens=4096)
 
-    # Extract YAML from the response (may be wrapped in markdown)
+    # Some providers (OpenAI, Gemini) force JSON output format, so the YAML
+    # may arrive wrapped inside a JSON object like {"yaml": "categories:\n..."}.
+    # Detect this and extract the YAML content from within.
     yaml_text = response.text.strip()
+    try:
+        obj = json.loads(yaml_text)
+        if isinstance(obj, dict):
+            best = max(
+                (v for v in obj.values() if isinstance(v, str)),
+                key=len, default=None,
+            )
+            if best:
+                yaml_text = best
+    except (json.JSONDecodeError, ValueError):
+        pass  # Not JSON — treat as raw YAML (Claude, local LLMs)
+
+    # Extract YAML from the response (may be wrapped in markdown)
     if "```yaml" in yaml_text:
         yaml_text = yaml_text.split("```yaml")[1].split("```")[0].strip()
     elif "```" in yaml_text:
