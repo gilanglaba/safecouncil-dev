@@ -158,6 +158,30 @@ def fetch_repo_files(owner: str, repo: str) -> dict:
     }
 
 
+# Keys that a valid agent profile must contain. Used by _unwrap_profile to
+# detect wrapper objects and by extract_agent_profile for fail-loud validation.
+_REQUIRED_PROFILE_KEYS = ("agent_name", "system_prompt", "use_case")
+
+
+def _unwrap_profile(data: dict) -> dict:
+    """
+    Detect and unwrap outer wrappers like {"agent_profile": {...}} or
+    {"response": {...}} that GPT-4o / Gemini sometimes return when JSON
+    mode is forced. Looks one level deep for a dict value containing any
+    of the required profile keys.
+
+    If the top-level dict already contains a required key, returns it as-is.
+    If no nested dict matches, returns data unchanged and lets downstream
+    validation raise a clear error.
+    """
+    if any(k in data for k in _REQUIRED_PROFILE_KEYS):
+        return data
+    for value in data.values():
+        if isinstance(value, dict) and any(k in value for k in _REQUIRED_PROFILE_KEYS):
+            return value
+    return data
+
+
 def extract_agent_profile(repo_data: dict, repo_name: str, claude_provider) -> dict:
     """
     Single Claude call to extract agent profile from README + code + examples.
@@ -257,9 +281,25 @@ Extract the agent profile as JSON. Make sure test_probes match the agent's actua
         from experts.base_expert import BaseExpert
         profile = BaseExpert.extract_json(raw)
 
-        # Validate required fields
-        required = ["agent_name", "system_prompt", "use_case"]
-        for field in required:
+        # GPT-4o / Gemini may wrap the response in an outer object even when
+        # the prompt asks for a flat schema. Unwrap one level if needed.
+        profile = _unwrap_profile(profile)
+
+        # If ALL required keys are missing, unwrap failed AND this isn't a
+        # partial extraction — it's a completely wrong response. Fail loudly
+        # instead of silently filling defaults and evaluating garbage.
+        if not any(profile.get(k) for k in _REQUIRED_PROFILE_KEYS):
+            logger.error(
+                f"LLM profile extraction returned unexpected shape — "
+                f"top-level keys: {list(profile.keys())[:10]}"
+            )
+            raise RuntimeError(
+                f"LLM did not return a valid agent profile. "
+                f"Top-level keys found: {list(profile.keys())[:10]}"
+            )
+
+        # Preserve tolerance for partial extractions (existing behavior)
+        for field in _REQUIRED_PROFILE_KEYS:
             if not profile.get(field):
                 profile[field] = f"Unknown {field} (extraction incomplete)"
 
