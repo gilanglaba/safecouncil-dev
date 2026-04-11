@@ -14,12 +14,20 @@ from unittest.mock import patch
 import pytest
 
 
+DEMO_SEATS = [
+    ("Expert A (Claude-simulation)", "claude"),
+    ("Expert B (GPT-4o-simulation)", "gpt4o"),
+    ("Expert C (Gemini-simulation)", "gemini"),
+]
+
+
 @pytest.mark.unit
 class TestOfflineProvider:
     def _provider(self):
         from experts.llm_providers.offline_provider import OfflineProvider
         p = OfflineProvider()
-        p.bound_expert_name = "Expert 1 (offline-deterministic)"
+        p.bound_expert_name = DEMO_SEATS[0][0]
+        p.simulated_provider = DEMO_SEATS[0][1]
         return p
 
     def test_provider_returns_valid_json_for_evaluate(self):
@@ -72,26 +80,42 @@ class TestOfflineProvider:
         from experts.llm_providers.offline_provider import OfflineProvider, _SHARED_FRAMEWORKS
         user = "**Agent Name:** VeriMedia\n\nConversations..."
         results = {}
-        for i in range(1, 4):
+        for name, sim_key in DEMO_SEATS:
             p = OfflineProvider()
-            p.bound_expert_name = f"Expert {i} (offline-deterministic)"
+            p.bound_expert_name = name
+            p.simulated_provider = sim_key
             resp = p.call("## EVALUATION RUBRIC", user)
-            results[i] = json.loads(resp.text)
+            results[name] = json.loads(resp.text)
 
         # All experts must produce dimension scores and findings.
-        for i in (1, 2, 3):
-            assert results[i]["dimension_scores"], f"Expert {i} produced no scores"
+        for name, _ in DEMO_SEATS:
+            assert results[name]["dimension_scores"], f"{name} produced no scores"
 
         # Per-expert overall scores must differ — that's what gives the
         # critique round something to resolve.
-        overalls = {results[i]["overall_score"] for i in (1, 2, 3)}
+        overalls = {results[name]["overall_score"] for name, _ in DEMO_SEATS}
         assert len(overalls) >= 2, f"Expected score variance across experts, got {overalls}"
 
         # All framework citations must come from the shared pool; NO
         # framework should be uniquely tied to one expert.
-        for i in (1, 2, 3):
-            for f in results[i].get("findings", []):
+        for name, _ in DEMO_SEATS:
+            for f in results[name].get("findings", []):
                 assert f["framework_ref"] in _SHARED_FRAMEWORKS
+
+    def test_provider_name_reflects_simulated_provider(self):
+        """
+        When simulated_provider is bound, provider_name returns the simulated
+        label (for UI distinguishability). When unset, it stays "offline".
+        """
+        from experts.llm_providers.offline_provider import OfflineProvider
+        p = OfflineProvider()
+        assert p.provider_name == "offline"
+        assert p.is_offline is True
+
+        p.simulated_provider = "claude"
+        assert p.provider_name == "claude"
+        # is_offline is class-identity, not label-based
+        assert p.is_offline is True
 
 
 @pytest.mark.unit

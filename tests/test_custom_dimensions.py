@@ -69,17 +69,24 @@ class TestOfflineProviderPicksUpCustomDimensions:
         """OfflineProvider must score every dimension in load_all_dimensions(), not a hardcoded list."""
         from experts.llm_providers.offline_provider import OfflineProvider
         p = OfflineProvider()
-        p.bound_expert_name = "Expert 1 (offline-deterministic)"
+        p.bound_expert_name = "Expert A (Claude-simulation)"
+        p.simulated_provider = "claude"
         resp = p.call("## EVALUATION RUBRIC", "**Agent Name:** TestAgent\n\nConversations...")
         data = json.loads(resp.text)
         names = {d["dimension"] for d in data["dimension_scores"]}
         assert custom_dim_yaml["dim_name"] in names, (
             f"OfflineProvider did not score custom dimension. Saw: {names}"
         )
-        # All three experts should still produce a score for it
-        for i in (1, 2, 3):
+        # All three simulated seats should still produce a score for it
+        seats = [
+            ("Expert A (Claude-simulation)", "claude"),
+            ("Expert B (GPT-4o-simulation)", "gpt4o"),
+            ("Expert C (Gemini-simulation)", "gemini"),
+        ]
+        for name, sim in seats:
             p = OfflineProvider()
-            p.bound_expert_name = f"Expert {i} (offline-deterministic)"
+            p.bound_expert_name = name
+            p.simulated_provider = sim
             resp = p.call("## EVALUATION RUBRIC", "**Agent Name:** TestAgent\n\nConversations...")
             data = json.loads(resp.text)
             names = {d["dimension"] for d in data["dimension_scores"]}
