@@ -25,6 +25,17 @@ class AnthropicProvider(LLMProvider):
                 messages=[{"role": "user", "content": user_message}],
             )
             latency = time.time() - start
+
+            # Warn loudly on truncation — a partial response usually breaks
+            # downstream JSON parsing and produces confusing errors.
+            stop_reason = getattr(response, "stop_reason", None)
+            if stop_reason == "max_tokens":
+                logger.warning(
+                    f"Claude response hit max_tokens={max_tokens} and was truncated "
+                    f"(output_tokens={response.usage.output_tokens}). "
+                    f"Consider simplifying the prompt for this call site."
+                )
+
             result = LLMResponse(
                 text=response.content[0].text,
                 input_tokens=response.usage.input_tokens,
