@@ -14,7 +14,7 @@ Live demo: [safecouncil.vercel.app](https://safecouncil.vercel.app)
 
 ## Quick Start
 
-**Prerequisites:** Python 3.11+ and Node.js 18+. Installation guides for Python and Node.js can be found at [python.org](https://www.python.org/downloads/) and [nodejs.org](https://nodejs.org/). API keys are optional — without them, SafeCouncil automatically runs in demo mode and you can still see the full synthesis pipeline end-to-end (see [Demo Mode](#demo-mode-run-without-api-keys) below).
+**Prerequisites:** Python 3.11+ and Node.js 18+. Installation guides for Python and Node.js can be found at [python.org](https://www.python.org/downloads/) and [nodejs.org](https://nodejs.org/). API keys are optional — without them, SafeCouncil automatically runs in demo mode and you can still see the full synthesis pipeline end-to-end (see [Demo Mode](#demo-mode) below).
 
 ### One-command (Makefile)
 
@@ -52,6 +52,24 @@ npm run dev
 ```
 
 Open http://localhost:3000 — the frontend proxies `/api/*` to the backend on port 5000.
+
+### Demo Mode
+
+Don't have API keys, or just want to try SafeCouncil without spending money on LLM calls? There are three ways to run a demo:
+
+**1. Click the "Test Demo" button on the Evaluate page.**
+The fastest way. Open the Evaluate page, click the **Test Demo** button, and you'll see a sample result right away. It always shows the same static example — it doesn't matter what you type in the form. No API calls, no waiting. Use this if you just want to see what a finished report looks like.
+
+**2. Set `DEMO_MODE` in `backend/.env`.**
+Open `backend/.env` and set one of these:
+
+- `DEMO_MODE=auto` *(recommended)* — SafeCouncil only switches to demo mode when **none** of your API keys work. If you add a key later, it goes back to the real pipeline automatically. This is the safest default.
+- `DEMO_MODE=true` — Always run in demo mode, even if you have API keys. Useful for teaching or screenshots.
+
+Unlike option 1, this option runs the **full evaluation pipeline** (all the experts, critiques, revisions, and synthesis steps) — but with stand-in data instead of real LLM calls. So you can see the whole flow working end-to-end, not just the final report.
+
+**3. Use just one API key (for example, only Anthropic).**
+If you only have one provider's key, SafeCouncil can still run a real evaluation — you just need to tell it to use that one provider for every expert seat. On the Evaluate page, go to **Expert Configuration** and change all three experts to the same provider (e.g. all Claude). Then run the evaluation normally. This gives you real LLM results without needing keys for every provider.
 
 ---
 
@@ -112,7 +130,7 @@ Submit an agent through one of four input methods → 3 LLM experts evaluate it 
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-Every LLM-facing step goes through `Expert` → `LLMProvider`, so adding a new provider means writing one class and registering it — no orchestrator changes. The **offline** provider is what lets the full deliberative pipeline run in DEMO_MODE without any API keys (see [Demo Mode](#demo-mode-run-without-api-keys) below).
+Every LLM-facing step goes through `Expert` → `LLMProvider`, so adding a new provider means writing one class and registering it — no orchestrator changes. The **offline** provider is what lets the full deliberative pipeline run in DEMO_MODE without any API keys (see [Demo Mode](#demo-mode) above).
 
 ---
 
@@ -246,12 +264,6 @@ safecouncil/
 | `LOCAL_MODEL` | If local expert enabled | — | Your local model name (no default) |
 | `LOCAL_API_KEY` | No | — | Optional bearer token for your local server |
 | `DEMO_MODE` | No | `auto` | `true` = force demo mode; `false` = force real mode; `auto` (default) = demo mode only when all three cloud API keys are missing or still set to `.env.example` placeholders |
-
----
-
-## Demo Mode
-
-When all three cloud API keys are missing (or still set to `.env.example` placeholders), SafeCouncil auto-engages demo mode and runs the **real** `SimpleOrchestrator` pipeline end-to-end via a deterministic `OfflineProvider` — no LLM calls, no template deepcopy. Critique, revision, and synthesis all execute, producing real `score_changes` and a real `debate_transcript`. Override with `DEMO_MODE=true|false|auto` in `backend/.env`. Verify the current mode at `GET /api/health`.
 
 ---
 
