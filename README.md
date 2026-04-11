@@ -8,7 +8,7 @@ Two council methods: **Deliberative** (cross-critique, score revision, debate sy
 
 Built for: NYU SPS × UNICC AI Governance Capstone — Spring 2026
 
-Live demo: [safecouncil.vercel.app](https://safecouncil.vercel.app)
+Live demo: [safecouncil.us](https://safecouncil.us)
 
 ---
 
@@ -53,23 +53,21 @@ npm run dev
 
 Open http://localhost:3000 — the frontend proxies `/api/*` to the backend on port 5000.
 
-### Demo Mode
+---
 
-Don't have API keys, or just want to try SafeCouncil without spending money on LLM calls? There are three ways to run a demo:
+## Demo Mode
 
-**1. Click the "Test Demo" button on the Evaluate page.**
-The fastest way. Open the Evaluate page, click the **Test Demo** button, and you'll see a sample result right away. It always shows the same static example — it doesn't matter what you type in the form. No API calls, no waiting. Use this if you just want to see what a finished report looks like.
+Three ways to run SafeCouncil without a full set of API keys:
 
-**2. Set `DEMO_MODE` in `backend/.env`.**
-Open `backend/.env` and set one of these:
+1. **Test Demo button.** On the Evaluate page, click **Test Demo**. Returns a static result regardless of your input. No pipeline, no API calls.
+2. **`DEMO_MODE` in `backend/.env`.** Edit `backend/.env` and set `DEMO_MODE=auto` or `DEMO_MODE=true`.
+   - `auto` — falls back to demo mode only when no API keys are configured. **Recommended.**
+   - `true` — always runs in demo mode, even if keys are present.
 
-- `DEMO_MODE=auto` *(recommended)* — SafeCouncil only switches to demo mode when **none** of your API keys work. If you add a key later, it goes back to the real pipeline automatically. This is the safest default.
-- `DEMO_MODE=true` — Always run in demo mode, even if you have API keys. Useful for teaching or screenshots.
+   Unlike option 1, this runs the full `SimpleOrchestrator` pipeline end-to-end with dummy data (real critique, revision, and synthesis steps) via `OfflineProvider`. No network calls.
+3. **Single API key.** Configure one key (e.g. `ANTHROPIC_API_KEY`) in `backend/.env`. Then on the Evaluate page, open **Expert Configuration** and change all three experts to that provider (e.g. all Claude). Runs the real pipeline with one provider.
 
-Unlike option 1, this option runs the **full evaluation pipeline** (all the experts, critiques, revisions, and synthesis steps) — but with stand-in data instead of real LLM calls. So you can see the whole flow working end-to-end, not just the final report.
-
-**3. Use just one API key (for example, only Anthropic).**
-If you only have one provider's key, SafeCouncil can still run a real evaluation — you just need to tell it to use that one provider for every expert seat. On the Evaluate page, go to **Expert Configuration** and change all three experts to the same provider (e.g. all Claude). Then run the evaluation normally. This gives you real LLM results without needing keys for every provider.
+Check current mode at `GET /api/health`.
 
 ---
 
