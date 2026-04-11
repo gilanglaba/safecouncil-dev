@@ -677,6 +677,13 @@ class EvaluationService:
             llm = expert_config.llm.lower()
             expert_num += 1
 
+            # Skip providers without a configured API key (unless a custom key
+            # was passed with the request). Avoids creating experts that will
+            # fail on the first API call with an auth error.
+            if not expert_config.custom_api_key and not registry.is_available(llm):
+                logger.warning(f"Skipping {llm} expert: no API key configured")
+                continue
+
             try:
                 provider = registry.create(
                     provider_key=llm,
