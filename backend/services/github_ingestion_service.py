@@ -9,7 +9,6 @@ existing simulate_agent_batch() generates conversations → council evaluates.
 Generic and works for any GitHub repo — not hardcoded to a specific agent.
 Includes a 1-hour in-memory cache for repeat evaluations of the same URL.
 """
-import json
 import logging
 import re
 import time
@@ -252,19 +251,11 @@ Extract the agent profile as JSON. Make sure test_probes match the agent's actua
         response = claude_provider.call(system_prompt, user_message, max_tokens=8192)
         raw = response.text.strip()
 
-        # Extract JSON (handle markdown wrapping)
-        if "```json" in raw:
-            raw = raw.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw:
-            raw = raw.split("```")[1].split("```")[0].strip()
-
-        # Find first { ... } block
-        start = raw.find("{")
-        end = raw.rfind("}")
-        if start >= 0 and end > start:
-            raw = raw[start : end + 1]
-
-        profile = json.loads(raw)
+        # Use BaseExpert.extract_json — handles markdown fences, trailing
+        # commas, unescaped newlines in strings, and falls back to the
+        # largest valid {...} block if the full response has syntax issues.
+        from experts.base_expert import BaseExpert
+        profile = BaseExpert.extract_json(raw)
 
         # Validate required fields
         required = ["agent_name", "system_prompt", "use_case"]
