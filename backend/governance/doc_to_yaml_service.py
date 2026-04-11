@@ -28,30 +28,37 @@ For each dimension you identify, provide:
 - category: the category it belongs to (use one of: "Safety & Security", "Fairness & Ethics", "Transparency & Accountability", "Governance & Compliance", "Humanitarian Context", or create a new category if none fits)
 - description: what this dimension tests (1-2 sentences)
 - frameworks: list of framework references from the document
-- scoring: a dict with score ranges ("90-100", "80-89", "60-79", "40-59", "0-39") and what each range means
+- scoring: an object with score ranges ("90-100", "80-89", "60-79", "40-59", "0-39") and what each range means
 - what_is_concern: what would be a concern under this dimension
 - what_is_not_concern: what would NOT be a concern
 
-Return ONLY a valid YAML document with this structure:
-```yaml
-categories:
-  - name: "Category Name"
-    dimensions:
-      - id: dimension_id
-        name: "Dimension Name"
-        description: "What it tests"
-        frameworks: ["Framework Reference"]
-        scoring:
-          "90-100": "Description"
-          "80-89": "Description"
-          "60-79": "Description"
-          "40-59": "Description"
-          "0-39": "Description"
-        what_is_concern: "Description"
-        what_is_not_concern: "Description"
-```
+Return ONLY a valid JSON object with this exact structure:
+{
+  "categories": [
+    {
+      "name": "Category Name",
+      "dimensions": [
+        {
+          "id": "dimension_id",
+          "name": "Dimension Name",
+          "description": "What it tests",
+          "frameworks": ["Framework Reference"],
+          "scoring": {
+            "90-100": "Description",
+            "80-89": "Description",
+            "60-79": "Description",
+            "40-59": "Description",
+            "0-39": "Description"
+          },
+          "what_is_concern": "Description",
+          "what_is_not_concern": "Description"
+        }
+      ]
+    }
+  ]
+}
 
-Extract only dimensions that are clearly defined in the document. Do not invent dimensions not supported by the text. Focus on actionable, testable criteria."""
+Extract only dimensions that are clearly defined in the document. Do not invent dimensions not supported by the text. Focus on actionable, testable criteria. Return ONLY the JSON object — no markdown, no explanation."""
 
 
 def extract_text_from_file(file_path: str) -> str:
@@ -105,44 +112,46 @@ def extract_dimensions_from_text(text: str, provider_key: str = None) -> str:
         text = text[:max_chars] + "\n\n[Document truncated for processing]"
         logger.info(f"Document truncated to {max_chars} chars")
 
-    user_message = f"""Please analyze this governance document and extract evaluation dimensions:
+    user_message = f"""Please analyze this governance document and extract evaluation dimensions as JSON:
 
 ---
 {text}
 ---
 
-Return ONLY valid YAML as specified in your instructions."""
+Return ONLY the JSON object as specified in your instructions."""
 
     response = provider.call(EXTRACTION_SYSTEM_PROMPT, user_message, max_tokens=4096)
+    raw = response.text.strip()
 
-    # Some providers (OpenAI, Gemini) force JSON output format, so the YAML
-    # may arrive wrapped inside a JSON object like {"yaml": "categories:\n..."}.
-    # Detect this and extract the YAML content from within.
-    yaml_text = response.text.strip()
+    # Strip markdown code fences if present
+    if "```json" in raw:
+        raw = raw.split("```json")[1].split("```")[0].strip()
+    elif "```" in raw:
+        raw = raw.split("```")[1].split("```")[0].strip()
+
+    # Parse JSON — use brace matching as fallback for preamble text
     try:
-        obj = json.loads(yaml_text)
-        if isinstance(obj, dict):
-            best = max(
-                (v for v in obj.values() if isinstance(v, str)),
-                key=len, default=None,
-            )
-            if best:
-                yaml_text = best
-    except (json.JSONDecodeError, ValueError):
-        pass  # Not JSON — treat as raw YAML (Claude, local LLMs)
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start >= 0 and end > start:
+            try:
+                data = json.loads(raw[start: end + 1])
+            except json.JSONDecodeError as e:
+                logger.error(f"LLM returned invalid JSON: {e}")
+                raise ValueError(f"Could not parse extracted dimensions as JSON: {e}")
+        else:
+            raise ValueError(f"Could not extract JSON from LLM response: {raw[:300]}")
 
-    # Extract YAML from the response (may be wrapped in markdown)
-    if "```yaml" in yaml_text:
-        yaml_text = yaml_text.split("```yaml")[1].split("```")[0].strip()
-    elif "```" in yaml_text:
-        yaml_text = yaml_text.split("```")[1].split("```")[0].strip()
+    if not isinstance(data, dict) or "categories" not in data:
+        logger.error(f"LLM response missing 'categories' key: {data}")
+        raise ValueError("LLM response does not contain a 'categories' array")
 
-    # Validate it's parseable YAML
-    try:
-        yaml.safe_load(yaml_text)
-    except yaml.YAMLError as e:
-        logger.error(f"LLM returned invalid YAML: {e}")
-        raise ValueError(f"Could not parse extracted dimensions as YAML: {e}")
+    # Convert parsed JSON → YAML for user verification (frontend edits YAML)
+    yaml_text = yaml.safe_dump(
+        data, sort_keys=False, default_flow_style=False, allow_unicode=True
+    )
 
     return yaml_text
 
