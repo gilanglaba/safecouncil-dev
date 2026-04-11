@@ -30,7 +30,7 @@ dev: $(VENV)
 
 run: $(VENV)
 	$(PYTHON) -c "import dotenv" 2>/dev/null || $(PIP) install -r backend/requirements.txt
-	cd backend && ../$(PYTHON) app.py
+	cd backend && FLASK_DEBUG=false ../$(PYTHON) app.py
 
 setup: $(VENV)
 	$(PIP) install -r backend/requirements.txt

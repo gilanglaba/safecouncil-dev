@@ -45,7 +45,11 @@ source .venv/bin/activate
 pip install -r backend/requirements.txt
 cp backend/.env.example backend/.env   # Edit with your API keys
 cd backend && python app.py
+```
 
+> **Note — Flask auto-reloader.** `FLASK_DEBUG=true` (the default) enables Werkzeug's auto-reloader, which restarts the backend process once on startup. This is normal and harmless for local development. If you're running in a script or CI environment, set `FLASK_DEBUG=false` in `backend/.env` to disable it.
+
+```bash
 # Frontend (separate terminal)
 cd frontend && npm install
 npm run dev
