@@ -16,7 +16,7 @@ Live demo: [safecouncil.us](https://safecouncil.us)
 
 **Prerequisites:** Python 3.11+ and Node.js 18+. Installation guides for Python and Node.js can be found at [python.org](https://www.python.org/downloads/) and [nodejs.org](https://nodejs.org/). API keys are optional — without them, SafeCouncil automatically runs in demo mode and you can still see the full synthesis pipeline end-to-end (see [Demo Mode](#demo-mode) below).
 
-### One-command (Makefile)
+### macOS / Linux
 
 ```bash
 # 1. Install backend deps + create .env from template
@@ -36,18 +36,17 @@ make dev
 
 `make dev` runs the backend in the background and the frontend in the foreground. Open http://localhost:3000.
 
-### Manual
+<details>
+<summary>Manual steps (without Make)</summary>
 
 ```bash
 # Backend
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
 cp backend/.env.example backend/.env   # Edit with your API keys
 cd backend && python app.py
 ```
-
-> **Note — Flask auto-reloader.** `FLASK_DEBUG=true` (the default) enables Werkzeug's auto-reloader, which restarts the backend process once on startup. This is normal and harmless for local development. If you're running in a script or CI environment, set `FLASK_DEBUG=false` in `backend/.env` to disable it.
 
 ```bash
 # Frontend (separate terminal)
@@ -55,7 +54,33 @@ cd frontend && npm install
 npm run dev
 ```
 
+</details>
+
+### Windows
+
+Windows does not ship with `make`. Use the manual steps below in **Command Prompt** or **PowerShell**.
+
+```bat
+:: Backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r backend\requirements.txt
+copy backend\.env.example backend\.env
+:: Edit backend\.env and add your API keys (optional — runs in demo mode without them)
+cd backend && python app.py
+```
+
+```bat
+:: Frontend (separate terminal)
+cd frontend && npm install
+npm run dev
+```
+
 Open http://localhost:3000 — the frontend proxies `/api/*` to the backend on port 5000.
+
+> **Tip:** Alternatively, install [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) for a full Linux environment where the Makefile commands work as-is.
+
+> **Note — Flask auto-reloader.** `FLASK_DEBUG=true` (the default) enables Werkzeug's auto-reloader, which restarts the backend process once on startup. This is normal and harmless for local development. If you're running in a script or CI environment, set `FLASK_DEBUG=false` in `backend/.env` to disable it.
 
 ---
 
@@ -271,6 +296,8 @@ safecouncil/
 
 ## Commands
 
+### macOS / Linux (Make)
+
 | Command | Purpose |
 |---|---|
 | `make setup` | Create venv, install backend deps, copy `.env.example` |
@@ -281,6 +308,20 @@ safecouncil/
 | `make test-api` | Integration tests (requires live server) |
 | `make test-all` | All tests including live LLM calls (requires keys) |
 | `make clean` | Remove venv and caches |
+
+### Windows (manual)
+
+| Step | Command |
+|---|---|
+| Create venv | `python -m venv .venv` |
+| Activate venv | `.venv\Scripts\activate` |
+| Install backend deps | `pip install -r backend\requirements.txt` |
+| Create env file | `copy backend\.env.example backend\.env` |
+| Install frontend deps | `cd frontend && npm install` |
+| Run backend | `cd backend && python app.py` |
+| Run frontend | `cd frontend && npm run dev` |
+| Unit tests | `set PYTHONPATH=backend && .venv\Scripts\python -m pytest -v` |
+| Integration tests | `set PYTHONPATH=backend && .venv\Scripts\python -m pytest -m integration -v` |
 
 ---
 
