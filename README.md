@@ -18,6 +18,8 @@ Live demo: [safecouncil.us](https://safecouncil.us)
 
 ### macOS / Linux
 
+The easiest way to get started is with `make`, which handles venv creation, dependency installation, and server startup in a few commands.
+
 ```bash
 # 1. Install backend deps + create .env from template
 make setup
@@ -37,7 +39,7 @@ make dev
 `make dev` runs the backend in the background and the frontend in the foreground. Open http://localhost:3000.
 
 <details>
-<summary>Manual steps (without Make)</summary>
+<summary>Manual steps — use these if Make is not installed or the commands above fail</summary>
 
 ```bash
 # Backend
