@@ -629,7 +629,7 @@ class SimpleOrchestrator(BaseOrchestrator):
         pricing = {
             "claude": {"input": 0.003, "output": 0.015},    # claude-sonnet
             "gpt4o": {"input": 0.0025, "output": 0.010},    # gpt-4o
-            "gemini": {"input": 0.00125, "output": 0.005},  # gemini-2.5-pro
+            "gemini": {"input": 0.00015, "output": 0.0006},  # gemini-2.5-flash
         }
         total = 0.0
         for expert in experts:

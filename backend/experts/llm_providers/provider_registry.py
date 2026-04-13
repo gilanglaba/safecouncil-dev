@@ -30,9 +30,8 @@ DEFAULT_PROVIDERS = {
         "class": GoogleProvider,
         "api_key_env": "GOOGLE_API_KEY",
         "model_env": "GEMINI_MODEL",
-        # gemini-1.5-pro is deprecated. Keep this in sync with
-        # Config.GEMINI_MODEL in backend/config.py.
-        "model_default": "gemini-2.5-pro",
+        # Keep this in sync with Config.GEMINI_MODEL in backend/config.py.
+        "model_default": "gemini-2.5-flash",
     },
     "local": {
         "class": OpenAIProvider,

@@ -396,7 +396,7 @@ class AggregateOrchestrator(BaseOrchestrator):
         pricing = {
             "claude": {"input": 0.003, "output": 0.015},
             "openai": {"input": 0.0025, "output": 0.010},
-            "gemini": {"input": 0.00125, "output": 0.005},
+            "gemini": {"input": 0.00015, "output": 0.0006},
             "local": {"input": 0.0, "output": 0.0},
         }
         for a in assessments:
