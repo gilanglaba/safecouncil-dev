@@ -346,6 +346,13 @@ Shared modules (`backend/models/schemas.py`, `tests/`, `Makefile`) are owned joi
 
 ---
 
+## Documents
+
+- [Presentation Deck](https://docs.google.com/presentation/d/13St1GilRBQ55r66b5EJWyFi4_-RPYR00/edit?usp=sharing&ouid=109847160669973185441&rtpof=true&sd=true)
+- [Paper](https://drive.google.com/drive/folders/1f3FyYuyYtnb_gPiXyC80yTO2T4ZivTuI?usp=sharing)
+
+---
+
 ## License
 
 MIT License — see LICENSE for details.
